@@ -1,0 +1,494 @@
+---
+title: Events
+description: Listen to native mobile events in your Laravel application
+---
+
+NativePHP Mobile dispatches events when native operations complete. You can listen to these events using Laravel's event system or Livewire's `#[On]` attribute.
+
+## Listening to Events
+
+### Using Laravel Event Listeners
+
+```php
+use Illuminate\Support\Facades\Event;
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+Event::listen(PhotoTaken::class, function (PhotoTaken $event) {
+    // Handle the event
+    $photoPath = $event->path;
+});
+```
+
+### Using Livewire Components
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class MyComponent extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+    public function handlePhotoTaken($data)
+    {
+        $photoPath = $data['path'];
+    }
+}
+```
+
+## Event Categories
+
+### Alert Events
+
+#### ButtonPressed
+
+Dispatched when a button in an alert dialog is pressed.
+
+**Namespace:** `Native\Mobile\Events\Alert\ButtonPressed`
+
+**Properties:**
+- `index` (int) - Button index (0-based)
+- `label` (string) - Button label text
+- `id` (string|null) - Alert tracking ID
+
+```php
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+Event::listen(ButtonPressed::class, function (ButtonPressed $event) {
+    if ($event->index === 0) {
+        // First button pressed
+    }
+});
+```
+
+---
+
+### App Lifecycle Events
+
+#### UpdateInstalled
+
+Dispatched when an app update is installed.
+
+**Namespace:** `Native\Mobile\Events\App\UpdateInstalled`
+
+**Properties:**
+- `version` (string) - The new version number
+- `timestamp` (int) - Installation timestamp
+
+```php
+use Native\Mobile\Events\App\UpdateInstalled;
+
+Event::listen(UpdateInstalled::class, function (UpdateInstalled $event) {
+    Log::info('App updated to version: ' . $event->version);
+});
+```
+
+---
+
+### Biometric Events
+
+#### Completed
+
+Dispatched when biometric authentication completes.
+
+**Namespace:** `Native\Mobile\Events\Biometric\Completed`
+
+**Properties:**
+- `success` (bool) - Whether authentication succeeded
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\Biometric\Completed;
+
+Event::listen(Completed::class, function (Completed $event) {
+    if ($event->success) {
+        // User authenticated
+    }
+});
+```
+
+---
+
+### Camera Events
+
+#### PhotoTaken
+
+Dispatched when a photo is successfully captured.
+
+**Namespace:** `Native\Mobile\Events\Camera\PhotoTaken`
+
+**Properties:**
+- `path` (string) - File path to the captured photo
+- `mimeType` (string) - MIME type (default: 'image/jpeg')
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+Event::listen(PhotoTaken::class, function (PhotoTaken $event) {
+    $photo = $event->path;
+});
+```
+
+#### PhotoCancelled
+
+Dispatched when photo capture is cancelled.
+
+**Namespace:** `Native\Mobile\Events\Camera\PhotoCancelled`
+
+**Properties:**
+- `cancelled` (bool) - Always true
+- `id` (string|null) - Tracking ID
+
+#### VideoRecorded
+
+Dispatched when a video is successfully recorded.
+
+**Namespace:** `Native\Mobile\Events\Camera\VideoRecorded`
+
+**Properties:**
+- `path` (string) - File path to the recorded video
+- `mimeType` (string) - MIME type (default: 'video/mp4')
+- `id` (string|null) - Tracking ID
+
+#### VideoCancelled
+
+Dispatched when video recording is cancelled.
+
+**Namespace:** `Native\Mobile\Events\Camera\VideoCancelled`
+
+**Properties:**
+- `cancelled` (bool) - Always true
+- `id` (string|null) - Tracking ID
+
+#### PermissionDenied
+
+Dispatched when camera permission is denied.
+
+**Namespace:** `Native\Mobile\Events\Camera\PermissionDenied`
+
+**Properties:**
+- `action` (string) - The attempted action: 'photo' or 'video'
+- `id` (string|null) - Tracking ID
+
+---
+
+### Gallery Events
+
+#### MediaSelected
+
+Dispatched when media is selected from the device gallery.
+
+**Namespace:** `Native\Mobile\Events\Gallery\MediaSelected`
+
+**Properties:**
+- `success` (bool) - Whether selection succeeded
+- `files` (array) - Array of selected file information
+- `count` (int) - Number of files selected
+- `error` (string|null) - Error message if failed
+- `cancelled` (bool) - Whether user cancelled
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\Gallery\MediaSelected;
+
+Event::listen(MediaSelected::class, function (MediaSelected $event) {
+    if ($event->success) {
+        foreach ($event->files as $file) {
+            // Process each file
+        }
+    }
+});
+```
+
+---
+
+### Geolocation Events
+
+#### LocationReceived
+
+Dispatched when a location is successfully retrieved.
+
+**Namespace:** `Native\Mobile\Events\Geolocation\LocationReceived`
+
+**Properties:**
+- `success` (bool) - Whether location was retrieved
+- `latitude` (float|null) - Latitude coordinate
+- `longitude` (float|null) - Longitude coordinate
+- `accuracy` (float|null) - Accuracy in meters
+- `timestamp` (int|null) - Unix timestamp
+- `provider` (string|null) - Location provider ('gps' or 'network')
+- `error` (string|null) - Error message if failed
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+Event::listen(LocationReceived::class, function (LocationReceived $event) {
+    if ($event->success) {
+        $lat = $event->latitude;
+        $lng = $event->longitude;
+    }
+});
+```
+
+#### PermissionStatusReceived
+
+Dispatched when permission status check completes.
+
+**Namespace:** `Native\Mobile\Events\Geolocation\PermissionStatusReceived`
+
+**Properties:**
+- `location` (string) - Overall location permission status
+- `coarseLocation` (string) - Approximate location permission
+- `fineLocation` (string) - Precise location permission
+- `id` (string|null) - Tracking ID
+
+#### PermissionRequestResult
+
+Dispatched when permission request completes.
+
+**Namespace:** `Native\Mobile\Events\Geolocation\PermissionRequestResult`
+
+**Properties:**
+- `location` (string) - Overall location permission status
+- `coarseLocation` (string) - Approximate location permission
+- `fineLocation` (string) - Precise location permission
+- `error` (string|null) - Error message if failed
+- `id` (string|null) - Tracking ID
+
+---
+
+### Microphone Events
+
+#### MicrophoneRecorded
+
+Dispatched when microphone recording completes.
+
+**Namespace:** `Native\Mobile\Events\Microphone\MicrophoneRecorded`
+
+**Properties:**
+- `path` (string) - File path to the recorded audio
+- `mimeType` (string) - MIME type (default: 'audio/m4a')
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\Microphone\MicrophoneRecorded;
+
+Event::listen(MicrophoneRecorded::class, function (MicrophoneRecorded $event) {
+    $audioPath = $event->path;
+});
+```
+
+#### MicrophoneCancelled
+
+Dispatched when microphone recording is cancelled.
+
+**Namespace:** `Native\Mobile\Events\Microphone\MicrophoneCancelled`
+
+**Properties:**
+- `cancelled` (bool) - Always true
+- `id` (string|null) - Tracking ID
+
+---
+
+### Push Notification Events
+
+#### TokenGenerated
+
+Dispatched when a push notification token is generated.
+
+**Namespace:** `Native\Mobile\Events\PushNotification\TokenGenerated`
+
+**Properties:**
+- `token` (string) - The push notification token
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\PushNotification\TokenGenerated;
+
+Event::listen(TokenGenerated::class, function (TokenGenerated $event) {
+    $token = $event->token;
+    // Save token to database
+});
+```
+
+---
+
+### Scanner Events
+
+#### CodeScanned
+
+Dispatched when a QR code or barcode is scanned.
+
+**Namespace:** `Native\Mobile\Events\Scanner\CodeScanned`
+
+**Properties:**
+- `data` (string) - The scanned code content
+- `format` (string) - The barcode format type
+- `id` (string|null) - Tracking ID
+
+```php
+use Native\Mobile\Events\Scanner\CodeScanned;
+
+Event::listen(CodeScanned::class, function (CodeScanned $event) {
+    $code = $event->data;
+    $format = $event->format; // 'qr', 'ean13', etc.
+});
+```
+
+#### ScannerCancelled
+
+Dispatched when the scanner is cancelled.
+
+**Namespace:** `Native\Mobile\Events\Scanner\ScannerCancelled`
+
+**Properties:**
+- `cancelled` (bool) - Always true
+- `reason` (string|null) - Cancellation reason
+- `id` (string|null) - Tracking ID
+
+---
+
+### Wallet Events
+
+#### PaymentCompleted
+
+Dispatched when payment is successfully completed.
+
+**Namespace:** `Native\Mobile\Events\Wallet\PaymentCompleted`
+
+**Properties:**
+- `paymentIntentId` (string) - The payment intent ID
+- `amount` (int) - Payment amount in smallest currency unit
+- `currency` (string) - Currency code
+- `status` (string) - Payment status
+- `metadata` (array|null) - Payment metadata
+
+```php
+use Native\Mobile\Events\Wallet\PaymentCompleted;
+
+Event::listen(PaymentCompleted::class, function (PaymentCompleted $event) {
+    $paymentId = $event->paymentIntentId;
+    $amount = $event->amount;
+});
+```
+
+#### PaymentFailed
+
+Dispatched when payment fails.
+
+**Namespace:** `Native\Mobile\Events\Wallet\PaymentFailed`
+
+**Properties:**
+- `paymentIntentId` (string) - The payment intent ID
+- `errorCode` (string) - Error code
+- `errorMessage` (string) - Error message
+- `metadata` (array|null) - Payment metadata
+
+#### PaymentCancelled
+
+Dispatched when user cancels the payment.
+
+**Namespace:** `Native\Mobile\Events\Wallet\PaymentCancelled`
+
+**Properties:**
+- `paymentIntentId` (string) - The payment intent ID
+- `reason` (string|null) - Cancellation reason
+
+---
+
+## Event Listener Examples
+
+### Centralized Event Handler
+
+```php
+// app/Providers/EventServiceProvider.php
+
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Native\Mobile\Events\Geolocation\LocationReceived;
+use Native\Mobile\Events\Wallet\PaymentCompleted;
+use App\Listeners\HandlePhotoTaken;
+use App\Listeners\HandleLocationReceived;
+use App\Listeners\HandlePaymentCompleted;
+
+protected $listen = [
+    PhotoTaken::class => [
+        HandlePhotoTaken::class,
+    ],
+    LocationReceived::class => [
+        HandleLocationReceived::class,
+    ],
+    PaymentCompleted::class => [
+        HandlePaymentCompleted::class,
+    ],
+];
+```
+
+### Listener Class Example
+
+```php
+// app/Listeners/HandlePhotoTaken.php
+
+namespace App\Listeners;
+
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+class HandlePhotoTaken
+{
+    public function handle(PhotoTaken $event): void
+    {
+        // Store photo metadata
+        Photo::create([
+            'user_id' => auth()->id(),
+            'path' => $event->path,
+            'mime_type' => $event->mimeType,
+        ]);
+    }
+}
+```
+
+### Queue Listeners
+
+```php
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class HandlePhotoTaken implements ShouldQueue
+{
+    public function handle(PhotoTaken $event): void
+    {
+        // Process photo asynchronously
+        ProcessPhoto::dispatch($event->path);
+    }
+}
+```
+
+### Conditional Event Handling
+
+```php
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+Event::listen(ButtonPressed::class, function (ButtonPressed $event) {
+    if ($event->id === 'delete-confirmation' && $event->index === 0) {
+        // User confirmed deletion
+        $this->performDelete();
+    }
+});
+```
+
+### Multiple Event Listeners
+
+```php
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Native\Mobile\Events\Camera\PhotoCancelled;
+
+Event::listen([
+    PhotoTaken::class,
+    PhotoCancelled::class,
+], function ($event) {
+    if ($event instanceof PhotoTaken) {
+        // Handle success
+    } else {
+        // Handle cancellation
+    }
+});
+```

@@ -1,0 +1,499 @@
+---
+title: Hot Reload
+description: Accelerate development with automatic code syncing
+---
+
+## Overview
+
+Hot reload enables you to see code changes instantly in your running mobile app without rebuilding or reinstalling. When you save a file, NativePHP detects the change and pushes updates to your app via WebSocket.
+
+## How It Works
+
+Hot reload uses a multi-component system:
+
+<Steps>
+  <Step title="File Watching">
+    Watchman monitors your project files for changes.
+  </Step>
+  
+  <Step title="Change Detection">
+    When a file is modified, the change is detected and queued.
+  </Step>
+  
+  <Step title="WebSocket Notification">
+    A WebSocket server pushes the change notification to connected devices.
+  </Step>
+  
+  <Step title="App Reload">
+    Your mobile app receives the notification and reloads the affected content.
+  </Step>
+</Steps>
+
+## Installation
+
+### Install Watchman
+
+Watchman is required for file watching:
+
+**macOS:**
+```bash
+brew install watchman
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install watchman
+```
+
+**Windows:**
+
+Download from [Watchman Releases](https://github.com/facebook/watchman/releases) and add to PATH.
+
+### Verify Installation
+
+```bash
+watchman --version
+```
+
+You should see version information if installed correctly.
+
+## Using Hot Reload
+
+### With Run Command
+
+Enable hot reload when running your app:
+
+```bash
+# Run with hot reload
+php artisan native:run android --watch
+php artisan native:run ios -W
+```
+
+The `--watch` (or `-W`) flag enables file watching automatically.
+
+### Standalone Watch Command
+
+Watch an already-running app:
+
+```bash
+# Watch Android
+php artisan native:watch android
+php artisan native:watch --android
+
+# Watch iOS
+php artisan native:watch ios
+php artisan native:watch --ios
+```
+
+Shorthand:
+
+```bash
+# Android
+php artisan native:watch a
+
+# iOS
+php artisan native:watch i
+```
+
+### Target Specific Device
+
+For iOS, specify a device UDID:
+
+```bash
+php artisan native:watch ios <device-udid>
+```
+
+## Configuration
+
+### Watch Paths
+
+Configure which directories to watch in `config/nativephp.php`:
+
+```php
+'hot_reload' => [
+    'watch_paths' => [
+        'app',
+        'resources',
+        'routes',
+        'config',
+        'public',
+    ],
+    
+    'exclude_patterns' => [
+        '\.git',
+        'storage',
+        'tests',
+        'nativephp',
+        'credentials',
+        'node_modules',
+        '\.swp',
+        '\.tmp',
+        '~',
+        '\.log',
+    ],
+],
+```
+
+### Watch Paths
+
+Files in these directories trigger hot reload:
+
+- `app` - PHP application code
+- `resources` - Views, CSS, JavaScript
+- `routes` - Route definitions
+- `config` - Configuration files
+- `public` - Public assets
+
+### Exclude Patterns
+
+Patterns to ignore (regex supported):
+
+- `\.git` - Git repository files
+- `storage` - Storage directory
+- `tests` - Test files
+- `node_modules` - Node dependencies
+- `\.log` - Log files
+
+### Server Configuration
+
+Configure the development server in `config/nativephp.php`:
+
+```php
+'server' => [
+    // HTTP server port for serving the app
+    'http_port' => env('NATIVEPHP_HTTP_PORT', 3000),
+    
+    // WebSocket server port for hot reload communication
+    'ws_port' => env('NATIVEPHP_WS_PORT', 8081),
+    
+    // Service name advertised on the network
+    'service_name' => env('NATIVEPHP_SERVICE_NAME', 'NativePHP Server'),
+    
+    // Service type for mDNS advertisement
+    'service_type' => '_http._tcp',
+    
+    // Public directory to serve
+    'public_path' => env('NATIVEPHP_PUBLIC_PATH', 'public'),
+    
+    // Build output directory
+    'build_path' => env('NATIVEPHP_BUILD_PATH', 'storage/app/native-build'),
+    
+    // Automatically open browser with QR code
+    'open_browser' => env('NATIVEPHP_OPEN_BROWSER', true),
+    
+    // Directories to watch for changes
+    'watch_paths' => [
+        'app',
+        'resources',
+        'routes',
+        'public/build',
+    ],
+    
+    // File extensions to watch
+    'watch_extensions' => ['php', 'blade.php', 'js', 'css', 'ts', 'vue', 'json'],
+],
+```
+
+### Environment Variables
+
+Customize via `.env`:
+
+```bash
+# HTTP server port
+NATIVEPHP_HTTP_PORT=3000
+
+# WebSocket server port
+NATIVEPHP_WS_PORT=8081
+
+# Service name
+NATIVEPHP_SERVICE_NAME="My App Dev Server"
+
+# Public directory
+NATIVEPHP_PUBLIC_PATH=public
+
+# Auto-open browser
+NATIVEPHP_OPEN_BROWSER=true
+```
+
+## WebSocket Connection
+
+### Connection Details
+
+Hot reload uses WebSocket for real-time communication:
+
+- **Protocol**: WebSocket (ws://)
+- **Default Port**: 8081
+- **Auto-Discovery**: Apps automatically discover the dev server via mDNS
+
+### Connection Flow
+
+<Steps>
+  <Step title="Server Start">
+    The WebSocket server starts when hot reload is enabled.
+  </Step>
+  
+  <Step title="mDNS Advertisement">
+    The server advertises itself on the local network.
+  </Step>
+  
+  <Step title="App Discovery">
+    The mobile app discovers the server automatically.
+  </Step>
+  
+  <Step title="WebSocket Connection">
+    The app establishes a WebSocket connection.
+  </Step>
+  
+  <Step title="Change Notification">
+    File changes are pushed to the app in real-time.
+  </Step>
+</Steps>
+
+### Manual Connection
+
+If auto-discovery fails, you can manually configure the server address.
+
+## File Watching Details
+
+### Watched File Types
+
+By default, these extensions trigger hot reload:
+
+- `php` - PHP files
+- `blade.php` - Blade templates
+- `js` - JavaScript files
+- `css` - Stylesheets
+- `ts` - TypeScript files
+- `vue` - Vue components
+- `json` - JSON configuration
+
+Configure in `server.watch_extensions`:
+
+```php
+'watch_extensions' => ['php', 'blade.php', 'js', 'css', 'ts', 'vue', 'json'],
+```
+
+### Excluding Files
+
+Exclude files from triggering reload:
+
+```php
+'exclude_patterns' => [
+    '\.git',           // Git files
+    'storage',         // Storage directory
+    'tests',          // Test files
+    'nativephp',      // NativePHP build artifacts
+    'node_modules',   // Node dependencies
+    '\.swp',          // Vim swap files
+    '\.tmp',          // Temporary files
+    '~',              // Backup files
+    '\.log',          // Log files
+],
+```
+
+Patterns are matched as regular expressions.
+
+## Integration with Vite
+
+Hot reload works alongside Vite for asset compilation:
+
+### Vite Dev Server
+
+When using `--watch`, NativePHP automatically starts the Vite dev server:
+
+```bash
+php artisan native:run android --watch
+```
+
+This starts:
+1. Watchman file watcher
+2. WebSocket server for hot reload
+3. Vite dev server for asset compilation
+
+### Asset Rebuilding
+
+Vite automatically rebuilds assets when you change:
+- JavaScript/TypeScript files
+- CSS files
+- Vue/React components
+
+The mobile app reloads when Vite completes the build.
+
+## Platform-Specific Behavior
+
+### Android
+
+On Android, hot reload:
+- Reloads the WebView content
+- Preserves app state where possible
+- Reconnects WebSocket if connection drops
+
+### iOS
+
+On iOS, hot reload:
+- Reloads the WKWebView content
+- Preserves navigation state
+- Handles background/foreground transitions
+
+## Troubleshooting
+
+### Watchman Not Found
+
+```
+Watchman is not installed
+```
+
+**Solution:** Install Watchman:
+
+```bash
+# macOS
+brew install watchman
+
+# Linux
+sudo apt-get install watchman
+```
+
+### WebSocket Connection Failed
+
+**Solutions:**
+- Ensure computer and device are on the same network
+- Check firewall isn't blocking port 8081
+- Verify `NATIVEPHP_WS_PORT` matches on both sides
+- Try restarting the watch command
+
+### Changes Not Detected
+
+**Solutions:**
+- Verify file is in a watched directory
+- Check file extension is in `watch_extensions`
+- Ensure file isn't in `exclude_patterns`
+- Restart Watchman: `watchman shutdown-server`
+
+### Too Many Files Watched
+
+```
+The user limit on the total number of inotify watches was reached
+```
+
+**Solution (Linux):**
+
+```bash
+echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+### Port Already in Use
+
+```
+Address already in use (port 8081)
+```
+
+**Solutions:**
+- Kill the process using the port
+- Change `NATIVEPHP_WS_PORT` to a different port
+- Restart your development environment
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Exclude unnecessary directories">
+    Add large directories that don't need watching to `exclude_patterns`:
+    
+    ```php
+    'exclude_patterns' => [
+        'vendor',
+        'node_modules',
+        'storage',
+    ],
+    ```
+  </Accordion>
+  
+  <Accordion title="Limit watch paths">
+    Only watch directories you actively change:
+    
+    ```php
+    'watch_paths' => [
+        'app',
+        'resources/views',
+    ],
+    ```
+  </Accordion>
+  
+  <Accordion title="Use specific file extensions">
+    Limit watched extensions to those you use:
+    
+    ```php
+    'watch_extensions' => ['php', 'blade.php'],
+    ```
+  </Accordion>
+  
+  <Accordion title="Restart Watchman periodically">
+    If watching becomes slow, restart Watchman:
+    
+    ```bash
+    watchman shutdown-server
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Development Workflow
+
+Optimal hot reload workflow:
+
+<Steps>
+  <Step title="Start with hot reload">
+    ```bash
+    php artisan native:run android --watch
+    ```
+  </Step>
+  
+  <Step title="Make code changes">
+    Edit your PHP, Blade, or JavaScript files.
+  </Step>
+  
+  <Step title="Save file">
+    Changes are detected automatically.
+  </Step>
+  
+  <Step title="App reloads">
+    View changes instantly in your mobile app.
+  </Step>
+  
+  <Step title="Iterate quickly">
+    Repeat steps 2-4 for rapid development.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use for UI work" icon="paint-brush">
+    Hot reload excels for rapid UI iteration and visual tweaks.
+  </Card>
+  
+  <Card title="Rebuild for major changes" icon="rotate">
+    Rebuild the app when changing:
+    - Native code
+    - Configuration files
+    - Dependencies
+  </Card>
+  
+  <Card title="Same network required" icon="wifi">
+    Ensure your computer and device are on the same local network.
+  </Card>
+  
+  <Card title="Test without hot reload" icon="vial">
+    Periodically test without hot reload to catch bundling issues.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Development Workflow" icon="code" href="/build/development-workflow">
+    Learn best practices for mobile development
+  </Card>
+  <Card title="Packaging" icon="box" href="/build/packaging">
+    Package your app for distribution
+  </Card>
+</CardGroup>

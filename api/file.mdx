@@ -1,0 +1,238 @@
+---
+title: File
+description: Move and copy files on the device file system
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\File;
+```
+
+## Methods
+
+### move()
+
+Move a file from one location to another on the device file system.
+
+<ParamField path="from" type="string" required>
+  Source file path
+</ParamField>
+
+<ParamField path="to" type="string" required>
+  Destination file path
+</ParamField>
+
+```php
+use Native\Mobile\Facades\File;
+
+$success = File::move(
+    '/path/to/temp/photo.jpg',
+    '/path/to/permanent/photo.jpg'
+);
+```
+
+<ResponseField name="return" type="bool">
+  True if the file was successfully moved, false otherwise
+</ResponseField>
+
+### copy()
+
+Copy a file from one location to another on the device file system.
+
+<ParamField path="from" type="string" required>
+  Source file path
+</ParamField>
+
+<ParamField path="to" type="string" required>
+  Destination file path
+</ParamField>
+
+```php
+use Native\Mobile\Facades\File;
+
+$success = File::copy(
+    '/path/to/original/document.pdf',
+    '/path/to/backup/document.pdf'
+);
+```
+
+<ResponseField name="return" type="bool">
+  True if the file was successfully copied, false otherwise
+</ResponseField>
+
+## Examples
+
+### Move Captured Photo to Permanent Storage
+
+```php
+use Native\Mobile\Facades\File;
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Livewire\Attributes\On;
+
+class PhotoManager extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+    public function handlePhotoTaken($data)
+    {
+        $tempPath = $data['path'];
+        $permanentPath = storage_path('app/photos/' . uniqid() . '.jpg');
+        
+        $success = File::move($tempPath, $permanentPath);
+        
+        if ($success) {
+            // Store permanent path in database
+            Photo::create(['path' => $permanentPath]);
+        }
+    }
+}
+```
+
+### Create Backup of Important File
+
+```php
+use Native\Mobile\Facades\File;
+
+class FileBackup
+{
+    public function backupFile(string $filePath): bool
+    {
+        $backupPath = $filePath . '.backup';
+        
+        return File::copy($filePath, $backupPath);
+    }
+    
+    public function createVersionedBackup(string $filePath): bool
+    {
+        $timestamp = date('Y-m-d_His');
+        $pathInfo = pathinfo($filePath);
+        
+        $backupPath = sprintf(
+            '%s/%s_%s.%s',
+            $pathInfo['dirname'],
+            $pathInfo['filename'],
+            $timestamp,
+            $pathInfo['extension']
+        );
+        
+        return File::copy($filePath, $backupPath);
+    }
+}
+```
+
+### Organize Downloads
+
+```php
+use Native\Mobile\Facades\File;
+
+class DownloadOrganizer
+{
+    public function organizeByType(string $downloadPath): void
+    {
+        $pathInfo = pathinfo($downloadPath);
+        $extension = $pathInfo['extension'];
+        
+        $targetDir = match($extension) {
+            'jpg', 'jpeg', 'png', 'gif' => 'images',
+            'pdf', 'doc', 'docx' => 'documents',
+            'mp3', 'wav', 'm4a' => 'audio',
+            'mp4', 'mov', 'avi' => 'videos',
+            default => 'other',
+        };
+        
+        $targetPath = storage_path("app/{$targetDir}/{$pathInfo['basename']}");
+        
+        File::move($downloadPath, $targetPath);
+    }
+}
+```
+
+### Duplicate Media File
+
+```php
+use Native\Mobile\Facades\File;
+use Native\Mobile\Facades\Dialog;
+
+class MediaDuplicator
+{
+    public function duplicateMedia(string $originalPath): void
+    {
+        $pathInfo = pathinfo($originalPath);
+        $copyPath = sprintf(
+            '%s/%s_copy.%s',
+            $pathInfo['dirname'],
+            $pathInfo['filename'],
+            $pathInfo['extension']
+        );
+        
+        $success = File::copy($originalPath, $copyPath);
+        
+        if ($success) {
+            Dialog::toast('File duplicated successfully');
+        } else {
+            Dialog::toast('Failed to duplicate file');
+        }
+    }
+}
+```
+
+### Move Multiple Files
+
+```php
+use Native\Mobile\Facades\File;
+
+class BatchFileMover
+{
+    public function moveFiles(array $files, string $targetDirectory): array
+    {
+        $results = [];
+        
+        foreach ($files as $file) {
+            $filename = basename($file);
+            $targetPath = rtrim($targetDirectory, '/') . '/' . $filename;
+            
+            $success = File::move($file, $targetPath);
+            
+            $results[$file] = [
+                'success' => $success,
+                'target' => $targetPath,
+            ];
+        }
+        
+        return $results;
+    }
+}
+```
+
+### Archive Old Files
+
+```php
+use Native\Mobile\Facades\File;
+
+class FileArchiver
+{
+    public function archiveOldFiles(string $sourceDir, string $archiveDir, int $daysOld = 30): int
+    {
+        $archivedCount = 0;
+        $cutoffTime = time() - ($daysOld * 86400);
+        
+        $files = glob($sourceDir . '/*');
+        
+        foreach ($files as $file) {
+            if (!is_file($file)) continue;
+            
+            if (filemtime($file) < $cutoffTime) {
+                $filename = basename($file);
+                $archivePath = rtrim($archiveDir, '/') . '/' . $filename;
+                
+                if (File::move($file, $archivePath)) {
+                    $archivedCount++;
+                }
+            }
+        }
+        
+        return $archivedCount;
+    }
+}
+```

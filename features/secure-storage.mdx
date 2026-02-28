@@ -1,0 +1,456 @@
+---
+title: Secure Storage
+description: Store sensitive data securely using the device's keychain or keystore
+---
+
+The Secure Storage API provides access to the device's native secure storage systems - Keychain on iOS and Keystore on Android. Use it to store sensitive data like tokens, passwords, and API keys.
+
+## Usage
+
+Store and retrieve secure data:
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+// Store a value
+SecureStorage::set('api_token', 'secret-token-here');
+
+// Retrieve a value
+$token = SecureStorage::get('api_token');
+
+// Delete a value
+SecureStorage::delete('api_token');
+```
+
+## Storing Data
+
+Store sensitive data securely in the device's keychain or keystore:
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+$success = SecureStorage::set('user_token', $token);
+
+if ($success) {
+    // Value stored successfully
+} else {
+    // Failed to store value
+}
+```
+
+### Storing Null Values
+
+You can store `null` to clear a value while keeping the key:
+
+```php
+SecureStorage::set('user_token', null);
+```
+
+## Retrieving Data
+
+Retrieve securely stored values:
+
+```php
+$token = SecureStorage::get('user_token');
+
+if ($token === null) {
+    // Key doesn't exist or value is null
+} else {
+    // Use the token
+}
+```
+
+<Note>
+The `get()` method returns `null` if the key doesn't exist or if the stored value is an empty string.
+</Note>
+
+## Deleting Data
+
+Permanently remove a value from secure storage:
+
+```php
+$success = SecureStorage::delete('user_token');
+
+if ($success) {
+    // Value deleted successfully
+} else {
+    // Failed to delete value (may not exist)
+}
+```
+
+## Methods Reference
+
+### `set(string $key, ?string $value)`
+
+Stores a value securely in the native keychain or keystore.
+
+**Parameters:**
+- `$key` (string) - The key to store the value under
+- `$value` (string|null) - The value to store securely
+
+**Returns:** `bool` - `true` if successfully stored, `false` otherwise
+
+```php
+$success = SecureStorage::set('api_key', 'sk_live_123456');
+```
+
+### `get(string $key)`
+
+Retrieves a securely stored value.
+
+**Parameters:**
+- `$key` (string) - The key to retrieve the value for
+
+**Returns:** `string|null` - The stored value, or `null` if not found
+
+```php
+$apiKey = SecureStorage::get('api_key');
+
+if ($apiKey) {
+    // Use the API key
+}
+```
+
+### `delete(string $key)`
+
+Removes a value from secure storage.
+
+**Parameters:**
+- `$key` (string) - The key to delete the value for
+
+**Returns:** `bool` - `true` if successfully deleted, `false` otherwise
+
+```php
+$deleted = SecureStorage::delete('api_key');
+```
+
+## Examples
+
+### Storing Authentication Tokens
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\SecureStorage;
+
+class Auth extends Component
+{
+    public function login($email, $password)
+    {
+        $response = Http::post('/api/login', [
+            'email' => $email,
+            'password' => $password,
+        ]);
+
+        if ($response->successful()) {
+            $token = $response->json('token');
+
+            // Store token securely
+            SecureStorage::set('auth_token', $token);
+
+            return redirect()->route('dashboard');
+        }
+
+        session()->flash('error', 'Invalid credentials');
+    }
+
+    public function logout()
+    {
+        // Remove stored token
+        SecureStorage::delete('auth_token');
+
+        return redirect()->route('login');
+    }
+}
+```
+
+### Auto-Login with Stored Credentials
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\SecureStorage;
+
+class LoginForm extends Component
+{
+    public function mount()
+    {
+        // Check for stored token
+        $token = SecureStorage::get('auth_token');
+
+        if ($token) {
+            // Verify token with API
+            $response = Http::withToken($token)->get('/api/user');
+
+            if ($response->successful()) {
+                // Token is valid, log user in
+                auth()->login($response->json('user'));
+                return redirect()->route('dashboard');
+            } else {
+                // Token expired, remove it
+                SecureStorage::delete('auth_token');
+            }
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.login-form');
+    }
+}
+```
+
+### Storing API Credentials
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class ApiConfiguration
+{
+    public function configure($apiKey, $apiSecret)
+    {
+        // Store API credentials securely
+        $keyStored = SecureStorage::set('stripe_api_key', $apiKey);
+        $secretStored = SecureStorage::set('stripe_api_secret', $apiSecret);
+
+        if ($keyStored && $secretStored) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function getApiClient()
+    {
+        $apiKey = SecureStorage::get('stripe_api_key');
+        $apiSecret = SecureStorage::get('stripe_api_secret');
+
+        if (!$apiKey || !$apiSecret) {
+            throw new Exception('API credentials not configured');
+        }
+
+        return new StripeClient($apiKey, $apiSecret);
+    }
+
+    public function clearCredentials()
+    {
+        SecureStorage::delete('stripe_api_key');
+        SecureStorage::delete('stripe_api_secret');
+    }
+}
+```
+
+### User Preferences with Sensitive Data
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class UserSettings extends Component
+{
+    public $email;
+    public $notificationsEnabled;
+
+    public function mount()
+    {
+        // Load settings
+        $this->email = SecureStorage::get('user_email');
+        $this->notificationsEnabled = SecureStorage::get('notifications') === 'true';
+    }
+
+    public function save()
+    {
+        // Save email securely
+        SecureStorage::set('user_email', $this->email);
+
+        // Save preference
+        SecureStorage::set('notifications', $this->notificationsEnabled ? 'true' : 'false');
+
+        session()->flash('message', 'Settings saved');
+    }
+
+    public function render()
+    {
+        return view('livewire.user-settings');
+    }
+}
+```
+
+### Encryption Key Storage
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+use Illuminate\Support\Str;
+
+class EncryptionManager
+{
+    public function getOrCreateEncryptionKey(): string
+    {
+        $key = SecureStorage::get('encryption_key');
+
+        if (!$key) {
+            // Generate new encryption key
+            $key = Str::random(32);
+            SecureStorage::set('encryption_key', $key);
+        }
+
+        return $key;
+    }
+
+    public function encrypt(string $data): string
+    {
+        $key = $this->getOrCreateEncryptionKey();
+        return encrypt($data, $key);
+    }
+
+    public function decrypt(string $encryptedData): string
+    {
+        $key = $this->getOrCreateEncryptionKey();
+        return decrypt($encryptedData, $key);
+    }
+
+    public function rotateKey(): void
+    {
+        // Generate new key
+        $newKey = Str::random(32);
+        SecureStorage::set('encryption_key', $newKey);
+    }
+}
+```
+
+## Platform Notes
+
+### iOS (Keychain)
+
+On iOS, Secure Storage uses the Keychain Services API:
+
+- Data is encrypted and stored in the device's Keychain
+- Data persists across app reinstalls (if enabled)
+- Data is automatically backed up to iCloud Keychain (if user has it enabled)
+- Data is protected by device passcode/biometric authentication
+- Data is isolated per app (other apps cannot access your data)
+
+**Security Features:**
+- Hardware-backed encryption on devices with Secure Enclave
+- Automatic encryption at rest
+- Protected by device lock
+
+### Android (Keystore)
+
+On Android, Secure Storage uses the Android Keystore System:
+
+- Data is encrypted using hardware-backed keys (on supported devices)
+- Data is isolated per app
+- Data does NOT persist across app uninstalls
+- Data is protected by device lock on Android 6.0+
+
+**Security Features:**
+- Hardware-backed encryption on devices with Trusted Execution Environment (TEE)
+- Automatic encryption at rest
+- Protected by device lock
+- StrongBox Keymaster support on Android 9+ (devices with dedicated security chip)
+
+## Best Practices
+
+### 1. Only Store Sensitive Data
+
+Use Secure Storage only for sensitive data. For regular preferences, use Laravel's cache or session:
+
+```php
+// Good - Secure Storage for tokens
+SecureStorage::set('auth_token', $token);
+
+// Bad - Use regular cache for non-sensitive data
+// SecureStorage::set('theme', 'dark');
+cache()->put('theme', 'dark');
+```
+
+### 2. Always Check Return Values
+
+Both `set()` and `delete()` return boolean success values:
+
+```php
+$success = SecureStorage::set('api_key', $key);
+
+if (!$success) {
+    // Handle storage failure
+    Log::error('Failed to store API key');
+}
+```
+
+### 3. Handle Null Returns
+
+Always check if `get()` returns `null`:
+
+```php
+$token = SecureStorage::get('auth_token');
+
+if ($token === null) {
+    // User not logged in or token expired
+    return redirect()->route('login');
+}
+```
+
+### 4. Use Descriptive Keys
+
+Use clear, namespaced keys to avoid collisions:
+
+```php
+// Good
+SecureStorage::set('auth.access_token', $token);
+SecureStorage::set('auth.refresh_token', $refreshToken);
+
+// Avoid
+SecureStorage::set('token', $token);
+```
+
+### 5. Clear on Logout
+
+Always remove sensitive data when users log out:
+
+```php
+public function logout()
+{
+    SecureStorage::delete('auth_token');
+    SecureStorage::delete('refresh_token');
+    SecureStorage::delete('user_email');
+
+    auth()->logout();
+}
+```
+
+### 6. Don't Store Large Data
+
+Secure Storage is designed for small pieces of data (tokens, keys, passwords). Don't store large amounts of data:
+
+```php
+// Good
+SecureStorage::set('api_token', $token);
+
+// Bad - Use encrypted database or files instead
+// SecureStorage::set('user_documents', json_encode($documents));
+```
+
+## Security Considerations
+
+1. **Device Lock Required**: On both iOS and Android, the security of Secure Storage depends on the device having a passcode/biometric lock enabled.
+
+2. **Jailbroken/Rooted Devices**: Secure Storage may be compromised on jailbroken (iOS) or rooted (Android) devices.
+
+3. **Backup Considerations**:
+   - iOS: Data may be backed up to iCloud Keychain
+   - Android: Data is NOT included in backups
+
+4. **No Encryption at Application Level**: Don't rely on Secure Storage alone for highly sensitive data. Consider additional encryption at the application level for critical secrets.
+
+5. **Key Rotation**: Implement key rotation for long-lived tokens:
+
+```php
+public function rotateToken()
+{
+    $oldToken = SecureStorage::get('auth_token');
+
+    // Request new token from API
+    $newToken = $this->refreshToken($oldToken);
+
+    // Update stored token
+    SecureStorage::set('auth_token', $newToken);
+}
+```

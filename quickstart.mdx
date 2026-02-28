@@ -1,80 +1,472 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Build and run your first NativePHP Mobile app in under 5 minutes
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This quickstart guide will walk you through creating a simple mobile app that demonstrates NativePHP's core capabilities. You'll build an app that:
 
-### Step 1: Set up your local environment
+- Displays a welcome screen
+- Captures photos using the device camera
+- Shows device information
+- Provides haptic feedback
+
+<Note>
+  This guide assumes you've already [installed NativePHP Mobile](/installation). If not, complete the installation first.
+</Note>
+
+## Build your first app
+
+<Steps>
+  <Step title="Create or prepare your Laravel app">
+    Start with a fresh Laravel application or use an existing one:
+    
+    ```bash
+    # Create a new Laravel app
+    composer create-project laravel/laravel my-mobile-app
+    cd my-mobile-app
+    
+    # Install NativePHP Mobile
+    composer require nativephp/mobile
+    
+    # Set up mobile platforms
+    php artisan native:install
+    ```
+    
+    When prompted, enter your app bundle ID (e.g., `com.yourname.myfirstapp`).
+  </Step>
+
+  <Step title="Create a simple mobile route">
+    Open `routes/web.php` and replace the default route:
+    
+    ```php routes/web.php
+    <?php
+    
+    use Illuminate\Support\Facades\Route;
+    use Illuminate\Http\Request;
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Facades\Device;
+    use Native\Mobile\Facades\Haptics;
+    
+    Route::get('/', function () {
+        return view('welcome', [
+            'deviceInfo' => Device::getInfo(),
+        ]);
+    });
+    
+    Route::post('/take-photo', function (Request $request) {
+        // Capture a photo from the camera
+        $photo = Camera::getPhoto([
+            'quality' => 80,
+            'allowEditing' => false,
+            'resultType' => 'base64',
+        ]);
+        
+        // Provide haptic feedback
+        Haptics::vibrate();
+        
+        // Store the photo (optional)
+        if ($photo && isset($photo['base64'])) {
+            $filename = 'photo_' . time() . '.jpg';
+            Storage::put('photos/' . $filename, base64_decode($photo['base64']));
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Photo captured!',
+                'filename' => $filename,
+            ]);
+        }
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to capture photo',
+        ], 400);
+    });
+    ```
+  </Step>
+
+  <Step title="Create a mobile-friendly view">
+    Create or update `resources/views/welcome.blade.php`:
+    
+    ```blade resources/views/welcome.blade.php
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>My First NativePHP App</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex flex-col items-center justify-center p-6">
+            @mobile
+                <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-4">
+                        Welcome to NativePHP Mobile!
+                    </h1>
+                    
+                    <p class="text-gray-600 mb-6">
+                        This app is built with PHP and Laravel, running natively on your device.
+                    </p>
+                    
+                    <div class="bg-blue-50 rounded-lg p-4 mb-6">
+                        <h2 class="font-semibold text-blue-900 mb-2">Device Info</h2>
+                        @if($deviceInfo)
+                            <pre class="text-sm text-blue-800 overflow-auto">{{ json_encode($deviceInfo, JSON_PRETTY_PRINT) }}</pre>
+                        @else
+                            <p class="text-blue-700 text-sm">Device information not available</p>
+                        @endif
+                    </div>
+                    
+                    <button 
+                        onclick="takePhoto()"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
+                    >
+                        📸 Take a Photo
+                    </button>
+                    
+                    <div id="result" class="mt-4 text-center text-sm"></div>
+                </div>
+            @endmobile
+            
+            @web
+                <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-4">
+                        Mobile App Only
+                    </h1>
+                    <p class="text-gray-600">
+                        This application is designed for mobile devices.
+                        Please build and run it using:
+                    </p>
+                    <code class="block mt-4 bg-gray-100 p-3 rounded text-sm">
+                        php artisan native:run
+                    </code>
+                </div>
+            @endweb
+        </div>
+        
+        <script>
+            async function takePhoto() {
+                const resultDiv = document.getElementById('result');
+                resultDiv.textContent = 'Opening camera...';
+                resultDiv.className = 'mt-4 text-center text-sm text-gray-600';
+                
+                try {
+                    const response = await fetch('/take-photo', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                        },
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        resultDiv.textContent = '✅ ' + data.message;
+                        resultDiv.className = 'mt-4 text-center text-sm text-green-600';
+                    } else {
+                        resultDiv.textContent = '❌ ' + data.message;
+                        resultDiv.className = 'mt-4 text-center text-sm text-red-600';
+                    }
+                } catch (error) {
+                    resultDiv.textContent = '❌ Error: ' + error.message;
+                    resultDiv.className = 'mt-4 text-center text-sm text-red-600';
+                }
+            }
+        </script>
+    </body>
+    </html>
+    ```
+  </Step>
+
+  <Step title="Configure camera permissions">
+    Add camera permissions to your `config/nativephp.php`:
+    
+    ```php config/nativephp.php
+    return [
+        // ... other config
+        
+        'permissions' => [
+            'camera' => 'We need camera access to take photos',
+        ],
+    ];
+    ```
+    
+    <Note>
+      After changing permissions, re-run `php artisan native:install --force` to update native project files.
+    </Note>
+  </Step>
+
+  <Step title="Run your app">
+    Build and launch your mobile app:
+    
+    <Tabs>
+      <Tab title="iOS">
+        ```bash
+        # Run on iOS Simulator
+        php artisan native:run ios
+        
+        # Or with hot reload for development
+        php artisan native:run ios --watch
+        ```
+        
+        The app will build and launch in the iOS Simulator. If you have multiple simulators, you'll be prompted to choose one.
+      </Tab>
+      
+      <Tab title="Android">
+        ```bash
+        # Run on Android Emulator
+        php artisan native:run android
+        
+        # Or with hot reload for development
+        php artisan native:run android --watch
+        ```
+        
+        Make sure an Android emulator is running, or connect a physical Android device with USB debugging enabled.
+      </Tab>
+    </Tabs>
+    
+    <Note>
+      The first build may take a few minutes as Gradle downloads dependencies. Subsequent builds will be much faster.
+    </Note>
+  </Step>
+
+  <Step title="Test the app">
+    Once the app launches:
+    
+    1. **Check device info** - You'll see device details displayed on screen
+    2. **Take a photo** - Tap the "Take a Photo" button
+    3. **Grant camera permission** - Allow camera access when prompted
+    4. **Capture an image** - Take a photo or choose from gallery
+    5. **Feel the haptic** - Your device will vibrate when the photo is captured
+    
+    Photos are saved to `storage/app/photos/` in your Laravel application.
+  </Step>
+</Steps>
+
+## Understanding the code
+
+Let's break down what's happening in this quickstart app:
+
+### Native facades
+
+NativePHP provides simple facades to access device features:
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Facades\Device;
+use Native\Mobile\Facades\Haptics;
+
+// Get device information
+$info = Device::getInfo();
+
+// Capture a photo with options
+$photo = Camera::getPhoto([
+    'quality' => 80,              // Image quality (0-100)
+    'allowEditing' => false,      // Allow user to edit before returning
+    'resultType' => 'base64',     // Return as base64 string
+]);
+
+// Provide haptic feedback
+Haptics::vibrate();
+```
+
+### Platform detection
+
+Blade directives help you write platform-specific code:
+
+```blade
+@mobile
+    {{-- Only shows in the mobile app --}}
+    <button onclick="takePhoto()">Take Photo</button>
+@endmobile
+
+@web
+    {{-- Only shows in web browser --}}
+    <p>Please use the mobile app</p>
+@endweb
+```
+
+You can also detect specific platforms:
+
+```blade
+@ios
+    <p>iOS-specific content</p>
+@endios
+
+@android
+    <p>Android-specific content</p>
+@endangroid
+```
+
+### API communication
+
+Your mobile app communicates with your Laravel backend via standard HTTP requests:
+
+```php
+// The app makes a POST request to this route
+Route::post('/take-photo', function (Request $request) {
+    $photo = Camera::getPhoto();
+    return response()->json(['success' => true]);
+});
+```
+
+The camera facade triggers native code, which returns data to PHP, just like any other Laravel request.
+
+## Development with hot reload
+
+For the best development experience, use the `--watch` flag:
+
+```bash
+php artisan native:run android --watch
+```
+
+This enables hot reloading:
+- **PHP changes** - Routes, controllers, and views automatically refresh
+- **Asset changes** - CSS and JavaScript updates appear instantly
+- **No rebuilding** - Changes appear without recompiling the app
+
+<Note>
+  Hot reload requires your development machine and mobile device/emulator to be on the same network.
+</Note>
+
+## Exploring more features
+
+Now that you have a working app, try adding more features:
+
+<CardGroup cols={2}>
+  <Card title="Geolocation" icon="location-dot" href="/features/geolocation">
+    Get the user's current position and track movement
+  </Card>
+  
+  <Card title="Secure storage" icon="lock" href="/features/secure-storage">
+    Store sensitive data securely on the device
+  </Card>
+  
+  <Card title="Dialogs" icon="message" href="/features/dialogs">
+    Show native alerts, toasts, and share sheets
+  </Card>
+  
+  <Card title="QR Scanner" icon="qrcode" href="/features/scanner">
+    Scan QR codes and barcodes
+  </Card>
+</CardGroup>
+
+### Quick example: Add geolocation
+
+Add this to your routes:
+
+```php
+use Native\Mobile\Facades\Geolocation;
+
+Route::get('/location', function () {
+    $position = Geolocation::getCurrentPosition(fineAccuracy: true);
+    
+    return response()->json($position);
+});
+```
+
+Update permissions in `config/nativephp.php`:
+
+```php
+'permissions' => [
+    'camera' => 'We need camera access to take photos',
+    'location' => 'We need your location to show nearby places',
+],
+```
+
+Run `php artisan native:install --force` and your app can now access GPS.
+
+## Building for production
+
+When you're ready to publish your app:
+
+<Tabs>
+  <Tab title="iOS">
+    ```bash
+    # Create a release build
+    php artisan native:run ios --build=release
+    
+    # Or package for App Store submission
+    php artisan native:package ios
+    ```
+    
+    See the [iOS deployment guide](/build/ios-deployment) for code signing and App Store submission.
+  </Tab>
+  
+  <Tab title="Android">
+    ```bash
+    # Create an APK for testing
+    php artisan native:run android --build=release
+    
+    # Create an AAB for Play Store
+    php artisan native:run android --build=bundle
+    ```
+    
+    See the [Android deployment guide](/build/android-deployment) for signing and Play Store submission.
+  </Tab>
+</Tabs>
+
+## Troubleshooting
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+  <Accordion title="Camera not working">
+    Make sure you:
+    1. Added camera permission to `config/nativephp.php`
+    2. Ran `php artisan native:install --force` after adding permissions
+    3. Granted permission when the app prompted you
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+  
+  <Accordion title="App won't launch">
+    Common issues:
+    - **iOS**: Make sure iOS Simulator is installed in Xcode
+    - **Android**: Ensure an emulator is running or device is connected
+    - Check for errors with: `php artisan native:tail ios` or `php artisan native:tail android`
+  </Accordion>
+  
+  <Accordion title="Hot reload not working">
+    Ensure:
+    - Your device/emulator and computer are on the same network
+    - No firewall is blocking ports 3000 and 8081
+    - The development server started successfully
+  </Accordion>
+  
+  <Accordion title="Build errors">
+    Try:
+    ```bash
+    # Clean and reinstall
+    php artisan native:install --force
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+    # Check logs
+    php artisan native:tail [platform]
+    ```
   </Accordion>
 </AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Congratulations! You've built your first NativePHP Mobile app. Here's what to explore next:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Native features" icon="sparkles" href="/features/camera">
+    Explore all available device features and APIs
+  </Card>
+  
+  <Card title="CLI reference" icon="terminal" href="/cli/install">
+    Learn about all available commands and options
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Customize your app's behavior and appearance
+  </Card>
+  
+  <Card title="Deployment" icon="rocket" href="/build/ios-deployment">
+    Prepare your app for the App Store and Play Store
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Join the NativePHP community on Discord to share your creations and get help from other developers!
 </Note>

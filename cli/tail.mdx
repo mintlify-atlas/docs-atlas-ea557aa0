@@ -1,0 +1,260 @@
+---
+title: native:tail
+description: Tail Laravel logs from the Android app
+---
+
+Streams Laravel application logs in real-time from a running Android application.
+
+## Syntax
+
+```bash
+php artisan native:tail
+```
+
+## What it does
+
+1. Connects to running Android app via `adb`
+2. Tails the Laravel log file from the app's storage
+3. Displays log entries in real-time
+4. Press Ctrl+C to stop
+
+## Examples
+
+### Tail logs from running app
+
+```bash
+php artisan native:tail
+```
+
+Output:
+```
+Tailing Android logs for app: com.example.myapp
+Press Ctrl+C to stop...
+
+[2024-02-28 10:30:15] local.INFO: User logged in
+[2024-02-28 10:30:22] local.DEBUG: Processing order #123
+[2024-02-28 10:30:25] local.ERROR: Payment failed: Connection timeout
+```
+
+## Requirements
+
+### ADB (Android Debug Bridge)
+
+Must be installed and in PATH:
+
+```bash
+# Check if installed
+adb version
+
+# macOS
+brew install android-platform-tools
+
+# Ubuntu/Debian
+sudo apt install android-tools-adb
+
+# Windows - comes with Android Studio
+```
+
+### Running Android app
+
+The app must be:
+- Installed on connected device/emulator
+- Currently running
+- Built with debuggable flag enabled
+
+### App ID
+
+`NATIVEPHP_APP_ID` must be set in `.env`:
+
+```env
+NATIVEPHP_APP_ID=com.example.myapp
+```
+
+## How it works
+
+Uses `adb shell run-as` to access the app's private storage:
+
+```bash
+adb shell run-as com.example.myapp \
+  tail -f app_storage/persisted_data/storage/logs/laravel.log
+```
+
+This reads from Laravel's standard log location within the app's sandboxed filesystem.
+
+## Common workflows
+
+### Run and monitor logs
+
+```bash
+# Terminal 1: Run the app
+php artisan native:run android
+
+# Terminal 2: Tail logs
+php artisan native:tail
+```
+
+### Debug with watch and logs
+
+```bash
+# Terminal 1: Run with watch
+php artisan native:run android --watch
+
+# Terminal 2: Tail logs
+php artisan native:tail
+
+# Terminal 3: Edit code
+vim app/Http/Controllers/HomeController.php
+```
+
+Now you see:
+- Code changes (Terminal 1)
+- Log output (Terminal 2)
+- Hot reload updates
+
+### Filter logs
+
+Pipe to grep for specific messages:
+
+```bash
+php artisan native:tail | grep ERROR
+php artisan native:tail | grep "User logged"
+```
+
+## Logging best practices
+
+Use Laravel's logging in your mobile app:
+
+```php
+use Illuminate\Support\Facades\Log;
+
+// Different log levels
+Log::debug('Debugging information');
+Log::info('User action', ['user_id' => 123]);
+Log::warning('Something unusual happened');
+Log::error('An error occurred', ['exception' => $e]);
+```
+
+### Add context
+
+Include useful context:
+
+```php
+Log::info('API request', [
+    'endpoint' => $url,
+    'method' => 'POST',
+    'duration' => $duration,
+    'response_code' => $response->status(),
+]);
+```
+
+### Performance logging
+
+```php
+$start = microtime(true);
+
+// Your code here
+
+$duration = microtime(true) - $start;
+Log::debug('Operation completed', [
+    'operation' => 'process_payment',
+    'duration_ms' => round($duration * 1000, 2),
+]);
+```
+
+## Troubleshooting
+
+### "NATIVEPHP_APP_ID is not set"
+
+Add to `.env`:
+
+```env
+NATIVEPHP_APP_ID=com.example.myapp
+```
+
+### "adb: command not found"
+
+Install Android platform tools:
+
+```bash
+# macOS
+brew install android-platform-tools
+
+# Or add to PATH
+export PATH=$PATH:$HOME/Library/Android/sdk/platform-tools
+```
+
+### "device offline" or "no devices"
+
+Check device connection:
+
+```bash
+adb devices
+```
+
+Should show:
+```
+List of devices attached
+emulator-5554   device
+```
+
+If offline:
+
+```bash
+adb kill-server
+adb start-server
+adb devices
+```
+
+### "run-as: package not debuggable"
+
+App must be built with debug flag. Use:
+
+```bash
+php artisan native:run android --build=debug
+```
+
+Release builds are not debuggable.
+
+### No log output
+
+Check:
+1. App is running: `adb shell ps | grep your.app.id`
+2. Log file exists: Trigger an action that logs
+3. Log level: Check `config/logging.php` level
+
+### Alternative: Use Logcat
+
+For system-level logs:
+
+```bash
+adb logcat | grep "your.app.id"
+```
+
+This shows all Android system logs, not just Laravel logs.
+
+## iOS equivalent
+
+For iOS, use Xcode Console:
+
+1. Run app with Xcode or `native:run ios`
+2. Open Xcode
+3. Window > Devices and Simulators
+4. Select your device/simulator
+5. Click "Open Console" button
+6. Filter by app name
+
+Or use command line:
+
+```bash
+# iOS Simulator
+xcrun simctl spawn booted log stream --predicate 'processImagePath contains "YourApp"'
+
+# Physical device (requires macOS)
+log stream --device --predicate 'processImagePath contains "YourApp"'
+```
+
+## See also
+
+- [native:run](/cli/run) - Run your app
+- [native:watch](/cli/watch) - Hot reload during development
+- [Debugging](/build/development-workflow) - Complete debugging guide

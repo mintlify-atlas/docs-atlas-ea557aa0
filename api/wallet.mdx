@@ -1,0 +1,512 @@
+---
+title: Wallet (Mobile Payments)
+description: Process payments with Apple Pay and Google Pay using Stripe integration
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+```
+
+## Methods
+
+### isAvailable()
+
+Check if Apple Pay (iOS) or Google Pay (Android) is available on the device.
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+$available = MobileWallet::isAvailable();
+
+if ($available) {
+    // Show payment button
+}
+```
+
+<ResponseField name="return" type="bool">
+  True if Apple Pay or Google Pay is available, false otherwise
+</ResponseField>
+
+### createPaymentIntent()
+
+Create a Stripe payment intent for the transaction.
+
+<ParamField path="amount" type="int" required>
+  Amount in smallest currency unit (cents for USD)
+</ParamField>
+
+<ParamField path="currency" type="string" default="usd">
+  Three-letter ISO currency code (lowercase)
+</ParamField>
+
+<ParamField path="metadata" type="array" default="[]">
+  Additional metadata to attach to the payment
+</ParamField>
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+$paymentIntent = MobileWallet::createPaymentIntent(
+    amount: 2999,        // $29.99
+    currency: 'usd',
+    metadata: [
+        'order_id' => '12345',
+        'customer_id' => auth()->id(),
+    ]
+);
+
+$clientSecret = $paymentIntent->client_secret;
+```
+
+<ResponseField name="return" type="object|null">
+  Payment intent data including client_secret, or null if failed
+</ResponseField>
+
+### presentPaymentSheet()
+
+Present the native payment sheet (Apple Pay or Google Pay) for card selection.
+
+<ParamField path="clientSecret" type="string" required>
+  The client secret from the payment intent
+</ParamField>
+
+<ParamField path="merchantDisplayName" type="string" required>
+  The merchant name to display on the payment sheet
+</ParamField>
+
+<ParamField path="publishableKey" type="string" required>
+  The Stripe publishable key
+</ParamField>
+
+<ParamField path="merchantId" type="string" required>
+  The Apple Pay merchant ID (e.g., "merchant.com.yourapp")
+</ParamField>
+
+<ParamField path="merchantCountryCode" type="string" default="US">
+  ISO country code
+</ParamField>
+
+<ParamField path="options" type="array" default="[]">
+  Additional options for the payment sheet
+</ParamField>
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+$result = MobileWallet::presentPaymentSheet(
+    clientSecret: $clientSecret,
+    merchantDisplayName: 'My Store',
+    publishableKey: config('services.stripe.key'),
+    merchantId: config('services.stripe.apple_merchant_id'),
+    merchantCountryCode: 'US'
+);
+```
+
+<ResponseField name="return" type="object|null">
+  Result of presenting the payment sheet, or null if failed
+</ResponseField>
+
+**Events:** Triggers `PaymentCompleted`, `PaymentFailed`, or `PaymentCancelled` events.
+
+### confirmPayment()
+
+Confirm the payment with the selected payment method.
+
+<ParamField path="paymentIntentId" type="string" required>
+  The payment intent ID to confirm
+</ParamField>
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+$confirmation = MobileWallet::confirmPayment($paymentIntentId);
+```
+
+<ResponseField name="return" type="object|null">
+  Confirmation result, or null if failed
+</ResponseField>
+
+### getPaymentStatus()
+
+Get the current payment status.
+
+<ParamField path="paymentIntentId" type="string" required>
+  The payment intent ID to check
+</ParamField>
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+$status = MobileWallet::getPaymentStatus($paymentIntentId);
+```
+
+<ResponseField name="return" type="object|null">
+  Payment status information, or null if unavailable
+</ResponseField>
+
+## Events
+
+### PaymentCompleted
+
+Dispatched when payment is successfully completed.
+
+```php
+use Native\Mobile\Events\Wallet\PaymentCompleted;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(PaymentCompleted::class, function (PaymentCompleted $event) {
+    $paymentIntentId = $event->paymentIntentId;
+    $amount = $event->amount;
+    $currency = $event->currency;
+    $status = $event->status;
+    $metadata = $event->metadata;
+});
+```
+
+**Event Properties:**
+- `paymentIntentId` (string) - The payment intent ID
+- `amount` (int) - Payment amount in smallest currency unit
+- `currency` (string) - Currency code
+- `status` (string) - Payment status
+- `metadata` (array|null) - Payment metadata
+
+### PaymentFailed
+
+Dispatched when payment fails.
+
+**Event Properties:**
+- `paymentIntentId` (string) - The payment intent ID
+- `errorCode` (string) - Error code
+- `errorMessage` (string) - Error message
+- `metadata` (array|null) - Payment metadata
+
+### PaymentCancelled
+
+Dispatched when user cancels the payment.
+
+**Event Properties:**
+- `paymentIntentId` (string) - The payment intent ID
+- `reason` (string|null) - Cancellation reason
+
+## Examples
+
+### Basic Payment Flow
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Events\Wallet\PaymentCompleted;
+use Native\Mobile\Events\Wallet\PaymentFailed;
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class CheckoutComponent extends Component
+{
+    public $total = 2999; // $29.99
+    public $orderId;
+    
+    public function checkout()
+    {
+        // Check if wallet payment is available
+        if (!MobileWallet::isAvailable()) {
+            Dialog::alert(
+                'Payment Unavailable',
+                'Apple Pay or Google Pay is not available on this device.',
+                ['OK']
+            );
+            return;
+        }
+        
+        // Create payment intent
+        $paymentIntent = MobileWallet::createPaymentIntent(
+            amount: $this->total,
+            currency: 'usd',
+            metadata: [
+                'order_id' => $this->orderId,
+                'user_id' => auth()->id(),
+            ]
+        );
+        
+        if (!$paymentIntent) {
+            Dialog::toast('Failed to initialize payment');
+            return;
+        }
+        
+        // Present payment sheet
+        MobileWallet::presentPaymentSheet(
+            clientSecret: $paymentIntent->client_secret,
+            merchantDisplayName: config('app.name'),
+            publishableKey: config('services.stripe.key'),
+            merchantId: config('services.stripe.apple_merchant_id')
+        );
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCompleted')]
+    public function handlePaymentCompleted($data)
+    {
+        // Update order status
+        Order::where('id', $data['metadata']['order_id'])
+            ->update(['status' => 'paid']);
+        
+        Dialog::toast('Payment successful!');
+        return redirect()->route('orders.confirmation', $this->orderId);
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentFailed')]
+    public function handlePaymentFailed($data)
+    {
+        Dialog::alert(
+            'Payment Failed',
+            $data['errorMessage'],
+            ['OK']
+        );
+    }
+}
+```
+
+### In-App Purchases
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+class SubscriptionPurchase extends Component
+{
+    public $plan;
+    
+    public function purchaseSubscription()
+    {
+        if (!MobileWallet::isAvailable()) {
+            $this->showAlternativePayment();
+            return;
+        }
+        
+        $paymentIntent = MobileWallet::createPaymentIntent(
+            amount: $this->plan->price_cents,
+            currency: $this->plan->currency,
+            metadata: [
+                'type' => 'subscription',
+                'plan_id' => $this->plan->id,
+                'user_id' => auth()->id(),
+            ]
+        );
+        
+        MobileWallet::presentPaymentSheet(
+            clientSecret: $paymentIntent->client_secret,
+            merchantDisplayName: config('app.name'),
+            publishableKey: config('services.stripe.key'),
+            merchantId: config('services.stripe.apple_merchant_id')
+        );
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCompleted')]
+    public function activateSubscription($data)
+    {
+        if ($data['metadata']['type'] === 'subscription') {
+            Subscription::create([
+                'user_id' => $data['metadata']['user_id'],
+                'plan_id' => $data['metadata']['plan_id'],
+                'stripe_payment_intent' => $data['paymentIntentId'],
+                'status' => 'active',
+                'started_at' => now(),
+            ]);
+            
+            Dialog::toast('Subscription activated!');
+        }
+    }
+}
+```
+
+### Tip Jar
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+class TipJar extends Component
+{
+    public $tipAmounts = [100, 300, 500, 1000]; // $1, $3, $5, $10
+    
+    public function sendTip(int $amount)
+    {
+        if (!MobileWallet::isAvailable()) {
+            Dialog::alert('Payment Unavailable', 'Mobile payments not available', ['OK']);
+            return;
+        }
+        
+        $paymentIntent = MobileWallet::createPaymentIntent(
+            amount: $amount,
+            currency: 'usd',
+            metadata: [
+                'type' => 'tip',
+                'creator_id' => $this->creator->id,
+                'tipper_id' => auth()->id(),
+            ]
+        );
+        
+        MobileWallet::presentPaymentSheet(
+            clientSecret: $paymentIntent->client_secret,
+            merchantDisplayName: $this->creator->name,
+            publishableKey: config('services.stripe.key'),
+            merchantId: config('services.stripe.apple_merchant_id')
+        );
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCompleted')]
+    public function handleTipSent($data)
+    {
+        if ($data['metadata']['type'] === 'tip') {
+            Tip::create([
+                'creator_id' => $data['metadata']['creator_id'],
+                'tipper_id' => $data['metadata']['tipper_id'],
+                'amount' => $data['amount'],
+                'currency' => $data['currency'],
+            ]);
+            
+            Dialog::toast('Thank you for your support!');
+        }
+    }
+}
+```
+
+### One-Click Checkout
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+class QuickCheckout extends Component
+{
+    public $cart;
+    
+    public function quickPay()
+    {
+        $total = $this->cart->total_cents;
+        
+        $paymentIntent = MobileWallet::createPaymentIntent(
+            amount: $total,
+            currency: 'usd',
+            metadata: [
+                'cart_id' => $this->cart->id,
+                'items' => $this->cart->items->pluck('id')->toArray(),
+            ]
+        );
+        
+        MobileWallet::presentPaymentSheet(
+            clientSecret: $paymentIntent->client_secret,
+            merchantDisplayName: config('app.name'),
+            publishableKey: config('services.stripe.key'),
+            merchantId: config('services.stripe.apple_merchant_id'),
+            options: [
+                'applePay' => [
+                    'merchantCapabilities' => ['3DS'],
+                ],
+            ]
+        );
+    }
+}
+```
+
+### Event Ticket Purchase
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+class TicketPurchase extends Component
+{
+    public $event;
+    public $quantity = 1;
+    
+    public function purchaseTickets()
+    {
+        $total = $this->event->price_cents * $this->quantity;
+        
+        $paymentIntent = MobileWallet::createPaymentIntent(
+            amount: $total,
+            currency: 'usd',
+            metadata: [
+                'event_id' => $this->event->id,
+                'quantity' => $this->quantity,
+                'user_id' => auth()->id(),
+            ]
+        );
+        
+        MobileWallet::presentPaymentSheet(
+            clientSecret: $paymentIntent->client_secret,
+            merchantDisplayName: $this->event->name,
+            publishableKey: config('services.stripe.key'),
+            merchantId: config('services.stripe.apple_merchant_id')
+        );
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCompleted')]
+    public function issueTickets($data)
+    {
+        $eventId = $data['metadata']['event_id'];
+        $quantity = $data['metadata']['quantity'];
+        
+        for ($i = 0; $i < $quantity; $i++) {
+            Ticket::create([
+                'event_id' => $eventId,
+                'user_id' => auth()->id(),
+                'code' => Str::uuid(),
+                'purchased_at' => now(),
+            ]);
+        }
+        
+        Dialog::toast('Tickets purchased!');
+    }
+}
+```
+
+### Multi-Currency Support
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+class MultiCurrencyCheckout extends Component
+{
+    public $amount;
+    public $currency;
+    
+    public function detectCurrency()
+    {
+        // Detect user's currency based on location
+        $info = Device::getInfo();
+        $decoded = json_decode($info);
+        
+        $this->currency = match($decoded->country ?? 'US') {
+            'US' => 'usd',
+            'GB' => 'gbp',
+            'EU' => 'eur',
+            'JP' => 'jpy',
+            default => 'usd',
+        };
+    }
+    
+    public function pay()
+    {
+        $paymentIntent = MobileWallet::createPaymentIntent(
+            amount: $this->convertToSmallestUnit($this->amount, $this->currency),
+            currency: $this->currency
+        );
+        
+        MobileWallet::presentPaymentSheet(
+            clientSecret: $paymentIntent->client_secret,
+            merchantDisplayName: config('app.name'),
+            publishableKey: config('services.stripe.key'),
+            merchantId: config('services.stripe.apple_merchant_id'),
+            merchantCountryCode: $this->getCountryCode()
+        );
+    }
+    
+    private function convertToSmallestUnit(float $amount, string $currency): int
+    {
+        // JPY doesn't use decimals
+        if ($currency === 'jpy') {
+            return (int) $amount;
+        }
+        
+        return (int) ($amount * 100);
+    }
+}
+```

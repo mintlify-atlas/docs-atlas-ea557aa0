@@ -1,0 +1,415 @@
+---
+title: Dialogs
+description: Display native alerts, confirmation dialogs, and toast notifications to users.
+---
+
+The Dialog API provides methods to display native alerts with customizable buttons and show toast notifications for brief messages.
+
+## Usage
+
+Show a simple alert:
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+Dialog::alert('Success', 'Your changes have been saved.');
+```
+
+## Methods
+
+### `alert(string $title, string $message, array $buttons = [])`
+
+Display a native alert dialog with customizable buttons.
+
+**Parameters:**
+- `$title` (string) - The alert title
+- `$message` (string) - The alert message
+- `$buttons` (array) - Optional array of button labels (default: ['OK'])
+
+**Returns:** `PendingAlert` - Fluent interface for configuring the alert
+
+**Example:**
+```php
+Dialog::alert(
+    'Confirm Delete',
+    'Are you sure you want to delete this item?',
+    ['Cancel', 'Delete']
+);
+```
+
+### `toast(string $message, string $duration = 'long')`
+
+Display a brief toast notification.
+
+**Parameters:**
+- `$message` (string) - The toast message
+- `$duration` (string) - Duration: `'short'` (~2s) or `'long'` (~3.5s) (default: `'long'`)
+
+**Returns:** `void`
+
+**Example:**
+```php
+Dialog::toast('Item added to cart');
+Dialog::toast('Processing...', 'short');
+```
+
+## Fluent Alert API
+
+The `PendingAlert` class provides a fluent interface for configuring alerts:
+
+### `id(string $id)`
+
+Set a unique identifier for the alert to correlate with button press events.
+
+**Example:**
+```php
+Dialog::alert('Delete?', 'This cannot be undone', ['Cancel', 'Delete'])
+    ->id('delete-confirmation');
+```
+
+### `event(string $eventClass)`
+
+Dispatch a custom event instead of the default `ButtonPressed` event.
+
+**Example:**
+```php
+Dialog::alert('Payment', 'Proceed with payment?', ['Cancel', 'Pay'])
+    ->event(PaymentConfirmed::class);
+```
+
+### `remember()`
+
+Store the alert ID in the session for later retrieval.
+
+**Example:**
+```php
+Dialog::alert('Confirm', 'Continue?', ['No', 'Yes'])
+    ->remember();
+
+// Later
+$alertId = PendingAlert::lastId();
+```
+
+### `show()`
+
+Explicitly display the alert (called automatically if not invoked).
+
+**Example:**
+```php
+Dialog::alert('Info', 'Check your email')
+    ->id('email-sent')
+    ->show();
+```
+
+## Events
+
+### `Native\Mobile\Events\Alert\ButtonPressed`
+
+Dispatched when a user presses a button in an alert dialog.
+
+**Properties:**
+- `index` (int) - Zero-based index of the pressed button
+- `label` (string) - The button label
+- `id` (string|null) - The alert identifier if one was set
+
+**Example:**
+```php
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+class ButtonPressedListener
+{
+    public function handle(ButtonPressed $event)
+    {
+        if ($event->id === 'delete-confirmation') {
+            if ($event->index === 1) { // "Delete" button
+                $this->deleteItem();
+            }
+            // index 0 = "Cancel" - do nothing
+        }
+    }
+}
+```
+
+## Examples
+
+### Simple Information Alert
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+public function showWelcome()
+{
+    Dialog::alert(
+        'Welcome!',
+        'Thank you for using our app.'
+    );
+}
+```
+
+### Confirmation Dialog
+
+```php
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+class ItemController extends Controller
+{
+    public function confirmDelete(Item $item)
+    {
+        Dialog::alert(
+            'Delete Item',
+            'Are you sure you want to delete this item? This action cannot be undone.',
+            ['Cancel', 'Delete']
+        )->id("delete-{$item->id}")->remember();
+    }
+}
+
+class DeleteConfirmationListener
+{
+    public function handle(ButtonPressed $event)
+    {
+        $alertId = PendingAlert::lastId();
+        
+        if (str_starts_with($event->id, 'delete-') && $event->index === 1) {
+            $itemId = str_replace('delete-', '', $event->id);
+            Item::find($itemId)?->delete();
+            
+            Dialog::toast('Item deleted successfully');
+        }
+    }
+}
+```
+
+### Multi-Option Alert
+
+```php
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+public function sortOptions()
+{
+    Dialog::alert(
+        'Sort By',
+        'How would you like to sort the list?',
+        ['Cancel', 'Name', 'Date', 'Price']
+    )->id('sort-dialog');
+}
+
+class SortOptionListener
+{
+    public function handle(ButtonPressed $event)
+    {
+        if ($event->id === 'sort-dialog' && $event->index > 0) {
+            $sortBy = match($event->index) {
+                1 => 'name',
+                2 => 'date',
+                3 => 'price',
+                default => 'name',
+            };
+            
+            session(['sort_by' => $sortBy]);
+            Dialog::toast("Sorted by {$event->label}");
+        }
+    }
+}
+```
+
+### Toast Notifications
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+class NotificationController extends Controller
+{
+    public function itemAdded()
+    {
+        // Short toast for quick actions
+        Dialog::toast('Added to cart', 'short');
+    }
+    
+    public function itemSaved()
+    {
+        // Long toast for important messages
+        Dialog::toast('Changes saved successfully', 'long');
+    }
+    
+    public function processing()
+    {
+        Dialog::toast('Processing your request...');
+    }
+}
+```
+
+### Form Validation Error
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+public function validateForm(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email',
+        'password' => 'required|min:8',
+    ]);
+    
+    if ($validator->fails()) {
+        $errors = $validator->errors()->all();
+        
+        Dialog::alert(
+            'Validation Error',
+            implode("\n", $errors),
+            ['OK']
+        );
+        
+        return;
+    }
+    
+    // Process form...
+    Dialog::toast('Form submitted successfully!');
+}
+```
+
+### Network Error Handling
+
+```php
+use Native\Mobile\Facades\Dialog;
+use Illuminate\Support\Facades\Http;
+
+public function syncData()
+{
+    try {
+        $response = Http::timeout(10)->post('/api/sync', [...]);
+        
+        if ($response->successful()) {
+            Dialog::toast('Data synced successfully');
+        } else {
+            Dialog::alert(
+                'Sync Failed',
+                'Unable to sync data. Please try again later.',
+                ['OK']
+            );
+        }
+    } catch (\Exception $e) {
+        Dialog::alert(
+            'Connection Error',
+            'No internet connection. Please check your network and try again.',
+            ['Retry', 'Cancel']
+        )->id('network-error');
+    }
+}
+```
+
+### Custom Event Handler
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+class PaymentConfirmed
+{
+    public function __construct(
+        public int $index,
+        public string $label,
+        public ?string $id = null
+    ) {}
+}
+
+Dialog::alert(
+    'Confirm Payment',
+    'You will be charged $99.99',
+    ['Cancel', 'Pay Now']
+)->event(PaymentConfirmed::class)->id('payment-123');
+
+class PaymentListener
+{
+    public function handle(PaymentConfirmed $event)
+    {
+        if ($event->index === 1) {
+            // Process payment
+            $this->processPayment($event->id);
+        }
+    }
+}
+```
+
+### Progressive Disclosure
+
+```php
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+public function deleteAccount()
+{
+    Dialog::alert(
+        'Delete Account',
+        'This will permanently delete your account and all data.',
+        ['Cancel', 'Continue']
+    )->id('delete-account-step1');
+}
+
+class AccountDeletionListener
+{
+    public function handle(ButtonPressed $event)
+    {
+        if ($event->id === 'delete-account-step1' && $event->index === 1) {
+            // Show second confirmation
+            Dialog::alert(
+                'Are You Sure?',
+                'This action cannot be undone. All your data will be lost forever.',
+                ['Go Back', 'Yes, Delete My Account']
+            )->id('delete-account-step2');
+        }
+        
+        if ($event->id === 'delete-account-step2' && $event->index === 1) {
+            // Actually delete the account
+            auth()->user()->delete();
+            Dialog::toast('Account deleted');
+        }
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+#### Alerts
+- Uses `UIAlertController` with `.alert` style
+- Native iOS appearance
+- Buttons arranged horizontally (up to 2) or vertically (3+)
+- Cancel button typically shown first
+- Dismisses automatically on button press
+
+#### Toasts
+- Custom implementation (iOS doesn't have native toasts)
+- Appears at bottom of screen
+- Automatically dismisses after duration
+- Non-blocking, user can interact with app
+
+### Android
+
+#### Alerts
+- Uses `AlertDialog` from Material Design
+- Native Android appearance
+- Buttons arranged according to Material guidelines
+- Negative button (Cancel) on left
+- Positive button (OK/Confirm) on right
+- Can be dismissed by tapping outside (configurable)
+
+#### Toasts
+- Uses native `Toast` class
+- Appears at bottom of screen by default
+- `LENGTH_SHORT` (~2 seconds)
+- `LENGTH_LONG` (~3.5 seconds)
+- Non-blocking, disappears automatically
+
+<Note>
+Button indexes start at 0. The first button in your array is index 0, the second is index 1, etc. Use this when handling `ButtonPressed` events.
+</Note>
+
+<Warning>
+Toast messages should be brief. For important information that requires acknowledgment, use an alert instead. Toasts automatically disappear and users cannot interact with them.
+</Warning>
+
+<Note>
+Alerts block user interaction with your app until dismissed. Use toasts for non-critical notifications that don't require user action.
+</Note>

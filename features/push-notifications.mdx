@@ -1,0 +1,438 @@
+---
+title: Push Notifications
+description: Request permissions and receive push notifications via APNS (iOS) and FCM (Android)
+---
+
+The Push Notifications API provides a unified interface for requesting push notification permissions and managing push tokens across iOS (APNS) and Android (FCM).
+
+## Usage
+
+Enroll for push notifications and request permissions:
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+// Simple enrollment
+PushNotifications::enroll();
+
+// Enrollment with tracking
+PushNotifications::enroll()
+    ->id('user-' . auth()->id())
+    ->remember();
+```
+
+When the token is generated, the `TokenGenerated` event is dispatched with the push token.
+
+## Requesting Permissions
+
+The `enroll()` method handles the entire permission flow:
+
+1. Requests notification permissions from the OS
+2. Registers for push notifications
+3. Generates a push token (APNS for iOS, FCM for Android)
+4. Dispatches the `TokenGenerated` event
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+PushNotifications::enroll();
+```
+
+## Checking Permission Status
+
+Check the current permission status without prompting the user:
+
+```php
+$status = PushNotifications::checkPermission();
+
+// Possible values:
+// - "granted" - User has granted permission
+// - "denied" - User has denied permission
+// - "not_determined" - User hasn't been asked yet
+// - "provisional" - iOS provisional authorization (quiet notifications)
+// - "ephemeral" - iOS ephemeral authorization (App Clips)
+
+if ($status === 'granted') {
+    // Notifications are enabled
+}
+```
+
+## Getting the Push Token
+
+Retrieve the current push token:
+
+```php
+$token = PushNotifications::getToken();
+
+if ($token) {
+    // APNS token on iOS, FCM token on Android
+    // Send this to your backend server
+}
+```
+
+## Listening for Token Generation
+
+Listen for the `TokenGenerated` event in your Livewire components:
+
+```php
+use Livewire\Attributes\On;
+use Native\Mobile\Events\PushNotification\TokenGenerated;
+
+class NotificationSettings extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\PushNotification\\TokenGenerated')]
+    public function handleTokenGenerated($data)
+    {
+        $token = $data['token'];
+        $id = $data['id'] ?? null;
+
+        // Save the token to your backend
+        auth()->user()->update([
+            'push_token' => $token,
+        ]);
+    }
+}
+```
+
+## Tracking Enrollment
+
+Use unique identifiers to track specific enrollment requests:
+
+```php
+// Enroll with an ID
+PushNotifications::enroll()
+    ->id('enrollment-' . time())
+    ->remember();
+
+// In your event handler
+#[On('native:Native\\Mobile\\Events\\PushNotification\\TokenGenerated')]
+public function handleTokenGenerated($data)
+{
+    $enrollmentId = $data['id'];
+    $rememberedId = PendingPushNotificationEnrollment::lastId();
+
+    if ($enrollmentId === $rememberedId) {
+        // This is the enrollment we initiated
+    }
+}
+```
+
+## Custom Event Classes
+
+Dispatch custom events when the token is generated:
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+use App\Events\UserEnrolledForNotifications;
+
+PushNotifications::enroll()
+    ->event(UserEnrolledForNotifications::class);
+```
+
+Your custom event should accept these parameters:
+
+```php
+namespace App\Events;
+
+class UserEnrolledForNotifications
+{
+    public function __construct(
+        public string $token,
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Methods Reference
+
+### PushNotifications Facade
+
+#### `enroll()`
+
+Requests push notification permissions and enrolls for notifications.
+
+**Returns:** `PendingPushNotificationEnrollment`
+
+```php
+PushNotifications::enroll();
+```
+
+#### `checkPermission()`
+
+Checks the current notification permission status without prompting.
+
+**Returns:** `string|null`
+
+**Possible values:**
+- `"granted"` - User has granted permission
+- `"denied"` - User has denied permission
+- `"not_determined"` - User hasn't been asked yet (iOS)
+- `"provisional"` - Provisional authorization granted (iOS)
+- `"ephemeral"` - Ephemeral authorization granted (iOS App Clips)
+
+```php
+$status = PushNotifications::checkPermission();
+
+if ($status === 'not_determined') {
+    // User hasn't been asked yet - good time to explain benefits
+}
+```
+
+#### `getToken()`
+
+Retrieves the current push notification token.
+
+**Returns:** `string|null`
+
+- On iOS: Returns APNS token
+- On Android: Returns FCM token
+- Returns `null` if no token is available
+
+```php
+$token = PushNotifications::getToken();
+
+if ($token) {
+    // Send token to your backend
+}
+```
+
+### PendingPushNotificationEnrollment Methods
+
+#### `id(string $id)`
+
+Sets a unique identifier for this enrollment.
+
+**Parameters:**
+- `$id` (string) - Unique identifier for the enrollment
+
+**Returns:** `self`
+
+```php
+PushNotifications::enroll()->id('user-123');
+```
+
+#### `getId()`
+
+Gets the enrollment's unique identifier. Generates a UUID if not set.
+
+**Returns:** `string`
+
+```php
+$enrollment = PushNotifications::enroll();
+$id = $enrollment->getId();
+```
+
+#### `event(string $eventClass)`
+
+Sets a custom event class to dispatch when the token is generated.
+
+**Parameters:**
+- `$eventClass` (string) - Fully qualified class name of the event
+
+**Returns:** `self`
+
+**Throws:** `InvalidArgumentException` if the class doesn't exist
+
+```php
+PushNotifications::enroll()->event(CustomTokenEvent::class);
+```
+
+#### `remember()`
+
+Stores the enrollment ID in the session for later retrieval.
+
+**Returns:** `self`
+
+```php
+PushNotifications::enroll()->id('user-123')->remember();
+```
+
+#### `lastId()`
+
+Retrieves the last remembered enrollment ID from the session.
+
+**Returns:** `string|null`
+
+```php
+$lastId = PendingPushNotificationEnrollment::lastId();
+```
+
+#### `enroll()`
+
+Explicitly starts the enrollment process.
+
+**Returns:** `void`
+
+```php
+PushNotifications::enroll()->enroll();
+```
+
+<Note>
+If you don't call `enroll()` explicitly, the enrollment will automatically start when the `PendingPushNotificationEnrollment` object is destroyed.
+</Note>
+
+## Complete Example
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\PendingPushNotificationEnrollment;
+
+class NotificationPreferences extends Component
+{
+    public $permissionStatus = 'unknown';
+    public $pushToken = null;
+    public $isEnrolled = false;
+
+    public function mount()
+    {
+        $this->checkPermissionStatus();
+        $this->pushToken = PushNotifications::getToken();
+        $this->isEnrolled = $this->pushToken !== null;
+    }
+
+    public function checkPermissionStatus()
+    {
+        $this->permissionStatus = PushNotifications::checkPermission() ?? 'unknown';
+    }
+
+    public function enableNotifications()
+    {
+        if ($this->permissionStatus === 'denied') {
+            // Can't request again - user must enable in settings
+            session()->flash('message', 'Please enable notifications in your device settings.');
+            return;
+        }
+
+        // Request permissions and enroll
+        PushNotifications::enroll()
+            ->id('user-' . auth()->id())
+            ->remember();
+    }
+
+    #[On('native:Native\\Mobile\\Events\\PushNotification\\TokenGenerated')]
+    public function handleTokenGenerated($data)
+    {
+        $token = $data['token'];
+        $enrollmentId = $data['id'] ?? null;
+        $rememberedId = PendingPushNotificationEnrollment::lastId();
+
+        // Verify this is our enrollment
+        if ($enrollmentId === $rememberedId) {
+            $this->pushToken = $token;
+            $this->isEnrolled = true;
+
+            // Save to database
+            auth()->user()->update([
+                'push_token' => $token,
+                'push_platform' => PHP_OS, // iOS or Android
+            ]);
+
+            // Send to your backend API
+            Http::post('https://api.yourapp.com/push-tokens', [
+                'user_id' => auth()->id(),
+                'token' => $token,
+                'platform' => PHP_OS,
+            ]);
+
+            session()->flash('message', 'Notifications enabled successfully!');
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.notification-preferences');
+    }
+}
+```
+
+## Platform Notes
+
+### iOS (APNS)
+
+- Returns APNS device token
+- Requires proper app signing with push notification capability
+- Configure push notifications in Xcode:
+  - Enable "Push Notifications" capability
+  - Configure APNS certificates in Apple Developer portal
+- Permission states:
+  - `not_determined` - User hasn't been asked
+  - `granted` - Full notification permissions
+  - `denied` - User declined permissions
+  - `provisional` - Provisional authorization (quiet notifications)
+  - `ephemeral` - App Clip authorization
+
+**Info.plist:**
+```xml
+<key>UIBackgroundModes</key>
+<array>
+    <string>remote-notification</string>
+</array>
+```
+
+### Android (FCM)
+
+- Returns Firebase Cloud Messaging (FCM) registration token
+- Requires Firebase configuration:
+  - Add `google-services.json` to your Android project
+  - Configure Firebase in your app's build.gradle
+- On Android 13+, requires POST_NOTIFICATIONS permission
+- Permission states are simpler:
+  - `granted` - Permission granted
+  - `denied` - Permission denied
+
+**AndroidManifest.xml (Android 13+):**
+```xml
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+```
+
+## Testing
+
+### Development Testing
+
+```php
+// Check if enrollment works
+$status = PushNotifications::checkPermission();
+dd($status); // Should return current permission state
+
+// Get current token
+$token = PushNotifications::getToken();
+dd($token); // Should return token if enrolled
+```
+
+### Testing Push Notifications
+
+1. **iOS**: Use APNS testing tools or your backend to send test notifications
+2. **Android**: Use Firebase Console to send test messages to specific tokens
+
+## Best Practices
+
+1. **Explain Before Asking**: Show users why notifications are valuable before requesting permission
+
+```php
+public function showNotificationBenefits()
+{
+    // Show modal explaining notification benefits
+    $this->showBenefitsModal = true;
+}
+
+public function requestPermissions()
+{
+    PushNotifications::enroll();
+}
+```
+
+2. **Handle Denied State**: Guide users to settings if they've denied permission
+
+```php
+if (PushNotifications::checkPermission() === 'denied') {
+    // Show instructions to enable in settings
+}
+```
+
+3. **Store Tokens Securely**: Always store push tokens associated with the user in your database
+
+4. **Update Tokens**: Tokens can change - always update when you receive a new one
+
+5. **Handle Token Expiry**: Implement logic to refresh tokens when they become invalid

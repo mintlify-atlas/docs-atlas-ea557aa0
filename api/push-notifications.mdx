@@ -1,0 +1,444 @@
+---
+title: Push Notifications
+description: Request permissions and manage push notification tokens for APNS and FCM
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+```
+
+## Methods
+
+### enroll()
+
+Request push notification permissions and enroll for notifications. Platform-agnostic method that handles both iOS APNS and Android FCM.
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+// Simple enrollment
+PushNotifications::enroll();
+
+// With tracking ID
+PushNotifications::enroll()
+    ->id('enrollment-' . auth()->id())
+    ->remember();
+```
+
+<ResponseField name="return" type="PendingPushNotificationEnrollment">
+  A pending enrollment instance for fluent configuration
+</ResponseField>
+
+**Events:** Triggers `TokenGenerated` event when successful.
+
+### checkPermission()
+
+Check current push notification permission status without prompting the user.
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+$status = PushNotifications::checkPermission();
+// Returns: 'granted', 'denied', 'not_determined', 'provisional', 'ephemeral'
+```
+
+<ResponseField name="return" type="string|null">
+  Permission status, or null if unavailable
+</ResponseField>
+
+**Permission statuses:**
+- `'granted'` - User has granted permission
+- `'denied'` - User has denied permission
+- `'not_determined'` - User hasn't been asked yet
+- `'provisional'` - iOS provisional authorization (quiet notifications)
+- `'ephemeral'` - iOS ephemeral authorization (App Clips)
+
+### getToken()
+
+Get the current push notification token (APNS token on iOS, FCM token on Android).
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+$token = PushNotifications::getToken();
+
+if ($token) {
+    // Save token to database for sending notifications
+    auth()->user()->update(['push_token' => $token]);
+}
+```
+
+<ResponseField name="return" type="string|null">
+  Push notification token, or null if not available
+</ResponseField>
+
+## PendingPushNotificationEnrollment Methods
+
+### id()
+
+Set a unique identifier for this enrollment to correlate with events.
+
+<ParamField path="id" type="string" required>
+  Unique identifier
+</ParamField>
+
+```php
+PushNotifications::enroll()
+    ->id('user-' . auth()->id());
+```
+
+### getId()
+
+Get the enrollment's unique identifier.
+
+```php
+$pending = PushNotifications::enroll();
+$id = $pending->getId(); // Returns UUID if not manually set
+```
+
+### event()
+
+Set a custom event class to dispatch when the token is generated.
+
+<ParamField path="eventClass" type="string" required>
+  Fully qualified event class name
+</ParamField>
+
+```php
+PushNotifications::enroll()
+    ->event(App\Events\PushTokenReceived::class);
+```
+
+### remember()
+
+Store this enrollment's ID in session for retrieval in event handlers.
+
+```php
+PushNotifications::enroll()
+    ->id('enrollment-123')
+    ->remember();
+```
+
+### lastId()
+
+Retrieve the last remembered enrollment ID from session.
+
+```php
+$lastId = \Native\Mobile\PendingPushNotificationEnrollment::lastId();
+```
+
+### enroll()
+
+Explicitly start the push notification enrollment process.
+
+```php
+PushNotifications::enroll()
+    ->id('enrollment-123')
+    ->enroll();
+```
+
+## Events
+
+### TokenGenerated
+
+Dispatched when a push notification token is successfully generated.
+
+```php
+use Native\Mobile\Events\PushNotification\TokenGenerated;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(TokenGenerated::class, function (TokenGenerated $event) {
+    $token = $event->token;
+    $id = $event->id;
+    
+    // Save token to database
+    auth()->user()->update(['push_token' => $token]);
+});
+```
+
+**Event Properties:**
+- `token` (string) - The push notification token (APNS or FCM)
+- `id` (string|null) - Tracking ID if set
+
+## Examples
+
+### Basic Push Notification Setup
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\Events\PushNotification\TokenGenerated;
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class NotificationSettings extends Component
+{
+    public $notificationsEnabled = false;
+    public $pushToken = null;
+    
+    public function enableNotifications()
+    {
+        PushNotifications::enroll()
+            ->id('user-' . auth()->id())
+            ->remember();
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\PushNotification\\TokenGenerated')]
+    public function handleTokenGenerated($data)
+    {
+        $this->pushToken = $data['token'];
+        $this->notificationsEnabled = true;
+        
+        // Save to database
+        auth()->user()->update([
+            'push_token' => $data['token'],
+            'push_enabled' => true,
+        ]);
+        
+        Dialog::toast('Notifications enabled successfully');
+    }
+}
+```
+
+### Permission Check Before Enrollment
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Facades\System;
+
+class PushPermissionManager
+{
+    public function requestNotifications()
+    {
+        $status = PushNotifications::checkPermission();
+        
+        match($status) {
+            'granted' => $this->updateToken(),
+            'denied' => $this->showPermissionDenied(),
+            'not_determined' => $this->enroll(),
+            default => $this->enroll(),
+        };
+    }
+    
+    private function enroll()
+    {
+        PushNotifications::enroll()->id('enrollment');
+    }
+    
+    private function updateToken()
+    {
+        $token = PushNotifications::getToken();
+        if ($token) {
+            auth()->user()->update(['push_token' => $token]);
+        }
+    }
+    
+    private function showPermissionDenied()
+    {
+        Dialog::alert(
+            'Notifications Disabled',
+            'Push notifications are disabled. Enable them in Settings?',
+            ['Open Settings', 'Cancel']
+        )->id('push-denied');
+        
+        // Handle button press to open settings
+        Event::listen(ButtonPressed::class, function ($event) {
+            if ($event->id === 'push-denied' && $event->index === 0) {
+                System::appSettings();
+            }
+        });
+    }
+}
+```
+
+### Token Refresh Handler
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+use Native\Mobile\Events\PushNotification\TokenGenerated;
+
+class PushTokenRefresher
+{
+    public function __construct()
+    {
+        Event::listen(TokenGenerated::class, [
+            $this, 'handleTokenRefresh'
+        ]);
+    }
+    
+    public function handleTokenRefresh(TokenGenerated $event)
+    {
+        $user = auth()->user();
+        $oldToken = $user->push_token;
+        $newToken = $event->token;
+        
+        if ($oldToken !== $newToken) {
+            // Update local database
+            $user->update(['push_token' => $newToken]);
+            
+            // Notify your backend
+            Http::post('https://api.example.com/push/token', [
+                'user_id' => $user->id,
+                'old_token' => $oldToken,
+                'new_token' => $newToken,
+                'platform' => System::isIos() ? 'ios' : 'android',
+            ]);
+            
+            Log::info('Push token updated', [
+                'user_id' => $user->id,
+                'token' => $newToken,
+            ]);
+        }
+    }
+}
+```
+
+### Topic Subscription
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+use Illuminate\Support\Facades\Http;
+
+class TopicSubscription
+{
+    public function subscribeToTopics(array $topics)
+    {
+        $token = PushNotifications::getToken();
+        
+        if (!$token) {
+            Dialog::alert(
+                'Enable Notifications',
+                'Please enable notifications to subscribe to topics.',
+                ['Enable', 'Cancel']
+            );
+            return;
+        }
+        
+        // Subscribe via your backend
+        Http::post('https://api.example.com/push/subscribe', [
+            'token' => $token,
+            'topics' => $topics,
+        ]);
+        
+        Dialog::toast('Subscribed to ' . count($topics) . ' topics');
+    }
+    
+    public function unsubscribeFromTopic(string $topic)
+    {
+        $token = PushNotifications::getToken();
+        
+        if ($token) {
+            Http::post('https://api.example.com/push/unsubscribe', [
+                'token' => $token,
+                'topic' => $topic,
+            ]);
+        }
+    }
+}
+```
+
+### Onboarding Flow with Push Notifications
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+use Livewire\Component;
+
+class OnboardingFlow extends Component
+{
+    public $step = 1;
+    public $pushEnabled = false;
+    
+    public function nextStep()
+    {
+        if ($this->step === 3) {
+            // Ask for push notifications
+            $this->requestPushPermission();
+        }
+        
+        $this->step++;
+    }
+    
+    public function requestPushPermission()
+    {
+        PushNotifications::enroll()
+            ->id('onboarding-' . auth()->id());
+    }
+    
+    public function skipNotifications()
+    {
+        auth()->user()->update(['push_skipped' => true]);
+        $this->nextStep();
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\PushNotification\\TokenGenerated')]
+    public function handleTokenGenerated($data)
+    {
+        $this->pushEnabled = true;
+        auth()->user()->update([
+            'push_token' => $data['token'],
+            'push_enabled' => true,
+        ]);
+        $this->nextStep();
+    }
+}
+```
+
+### Notification Preferences
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+class NotificationPreferences extends Component
+{
+    public $enabled = false;
+    public $categories = [
+        'messages' => true,
+        'updates' => true,
+        'promotions' => false,
+    ];
+    
+    public function mount()
+    {
+        $status = PushNotifications::checkPermission();
+        $this->enabled = $status === 'granted';
+    }
+    
+    public function toggleNotifications()
+    {
+        if (!$this->enabled) {
+            PushNotifications::enroll();
+        } else {
+            // Remove token from backend
+            $this->removeToken();
+        }
+    }
+    
+    public function updatePreferences()
+    {
+        $token = PushNotifications::getToken();
+        
+        Http::post('https://api.example.com/push/preferences', [
+            'token' => $token,
+            'categories' => $this->categories,
+        ]);
+        
+        Dialog::toast('Preferences updated');
+    }
+    
+    private function removeToken()
+    {
+        $token = auth()->user()->push_token;
+        
+        Http::delete('https://api.example.com/push/token', [
+            'token' => $token,
+        ]);
+        
+        auth()->user()->update([
+            'push_token' => null,
+            'push_enabled' => false,
+        ]);
+    }
+}
+```

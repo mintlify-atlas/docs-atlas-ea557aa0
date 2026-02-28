@@ -1,0 +1,153 @@
+---
+title: native:run
+description: Build, package, and run the NativePHP app
+---
+
+Builds your Laravel application and launches it on a mobile device or simulator/emulator.
+
+## Syntax
+
+```bash
+php artisan native:run [os] [udid] [options]
+```
+
+## Arguments
+
+### os
+
+Platform to run on. Optional.
+
+- `android` or `a` - Run on Android
+- `ios` or `i` - Run on iOS (macOS only)
+
+If not specified, you'll be prompted to choose.
+
+### udid
+
+The device/simulator UDID to run on. Optional.
+
+If not specified, the default device will be used or you'll be prompted to select one.
+
+## Options
+
+### --ios
+
+Target iOS platform (shorthand for `os=ios`).
+
+```bash
+php artisan native:run --ios
+```
+
+### --android
+
+Target Android platform (shorthand for `os=android`).
+
+```bash
+php artisan native:run --android
+```
+
+### --build=TYPE
+
+Build type. Default: `debug`
+
+- `debug` - Debug build with developer tools
+- `release` - Release build (optimized, signed)
+- `bundle` - Android App Bundle (AAB) for Play Store
+
+```bash
+php artisan native:run --build=release
+```
+
+### --watch, -W
+
+Enable hot reloading during development. File changes will automatically sync to the running app.
+
+```bash
+php artisan native:run --watch
+```
+
+### --start-url=PATH
+
+Set the initial URL/path to load when the app starts.
+
+```bash
+php artisan native:run --start-url=/dashboard
+```
+
+This updates `NATIVEPHP_START_URL` in your `.env` file.
+
+### --no-tty
+
+Disable TTY mode for non-interactive environments (CI/CD).
+
+```bash
+php artisan native:run --no-tty
+```
+
+## Examples
+
+### Run on Android with hot reload
+
+```bash
+php artisan native:run android --watch
+```
+
+### Run on iOS simulator
+
+```bash
+php artisan native:run ios
+```
+
+### Run release build on specific Android device
+
+```bash
+php artisan native:run android emulator-5554 --build=release
+```
+
+### Run with custom start URL
+
+```bash
+php artisan native:run --ios --start-url=/welcome
+```
+
+### Quick Android run with shorthand
+
+```bash
+php artisan native:run a -W
+```
+
+## What it does
+
+1. **Validates configuration**: Checks that `NATIVEPHP_APP_ID` is set
+2. **Prepares build**: Copies PHP application to native project
+3. **Compiles assets**: Runs Vite/Mix build process
+4. **Builds native app**: Compiles Android (Gradle) or iOS (Xcode) project
+5. **Installs app**: Deploys to connected device or simulator
+6. **Launches app**: Starts the application on the device
+
+## Hot reload with --watch
+
+When using the `--watch` flag:
+
+- **Requires Watchman**: Install from [https://facebook.github.io/watchman/](https://facebook.github.io/watchman/)
+- **Monitors changes**: Watches your Laravel application files
+- **Auto-syncs**: Pushes changes to the running app without rebuilding
+- **Fast iteration**: See changes in seconds instead of minutes
+
+## Platform notes
+
+**Android**
+- Requires Android SDK and emulator or physical device
+- Supports WSL on Windows (via adb connection)
+- First build may take several minutes
+
+**iOS**
+- Only available on macOS
+- Requires Xcode and iOS Simulator or physical device
+- Physical devices require Apple Developer account
+
+## See also
+
+- [native:watch](/cli/watch) - Hot reload for running apps
+- [native:package](/cli/package) - Build production-ready packages
+- [native:build-ios](/cli/build-ios) - iOS-specific build command

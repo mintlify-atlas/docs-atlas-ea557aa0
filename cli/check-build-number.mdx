@@ -1,0 +1,232 @@
+---
+title: native:check-build-number
+description: Check latest build numbers from app stores
+---
+
+Retrieves the latest build numbers (version codes) from Google Play Store and Apple App Store to ensure your next build uses a higher number.
+
+## Syntax
+
+```bash
+php artisan native:check-build-number {platform} [options]
+```
+
+## Arguments
+
+### platform
+
+The platform to check. Required.
+
+- `android` - Check Google Play Store
+- `ios` - Check Apple App Store Connect
+- `both` - Check both platforms
+
+## Options
+
+### --google-service-key=PATH
+
+Path to Google Service Account JSON key file (required for Android).
+
+```bash
+php artisan native:check-build-number android --google-service-key=./service-account.json
+```
+
+Alternatively, set `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env`.
+
+### --api-key=PATH
+
+Path to App Store Connect API key file (required for iOS).
+
+```bash
+php artisan native:check-build-number ios --api-key=./AuthKey.p8
+```
+
+Alternatively, set `APP_STORE_API_KEY_PATH` in `.env`.
+
+### --update
+
+Update local build number to store latest + 1.
+
+```bash
+php artisan native:check-build-number android --update
+```
+
+This updates `NATIVEPHP_APP_VERSION_CODE` in your `.env` file.
+
+### --jump-by=NUMBER
+
+Add extra number to the suggested version (e.g., `--jump-by=10` to skip ahead).
+
+```bash
+php artisan native:check-build-number android --jump-by=10
+```
+
+Useful when you want to reserve build numbers or skip ahead for any reason.
+
+## Examples
+
+### Check Android build number
+
+```bash
+php artisan native:check-build-number android
+```
+
+Output:
+```
+Play Store latest: 42
+Local current: 40
+Suggested next: 43
+To update: add --update flag
+```
+
+### Check and auto-update
+
+```bash
+php artisan native:check-build-number android --update
+```
+
+Updates `.env` with next build number.
+
+### Check with jump ahead
+
+```bash
+php artisan native:check-build-number android --jump-by=5
+```
+
+Output:
+```
+Play Store latest: 42
+Local current: 40
+Original suggested: 43
+Jumping by: 5
+Final suggested: 48
+```
+
+### Check both platforms
+
+```bash
+php artisan native:check-build-number both
+```
+
+## What it does
+
+### Android
+
+1. Connects to Google Play Console API using service account
+2. Retrieves latest version code from all tracks (internal, alpha, beta, production)
+3. Compares with local `NATIVEPHP_APP_VERSION_CODE`
+4. Suggests next version code (latest + 1 + jump-by)
+5. Optionally updates `.env` with new version code
+
+### iOS
+
+1. Connects to App Store Connect API
+2. Retrieves latest build number from all builds
+3. Compares with local `NATIVEPHP_APP_VERSION_CODE`
+4. Suggests next build number (latest + 1)
+5. Optionally updates `.env` with new build number
+
+## Build number vs Version name
+
+- **Build number** (version code): Integer that must increase with each release
+  - Android: `versionCode` (e.g., 42)
+  - iOS: CFBundleVersion (e.g., 42)
+  - Set via: `NATIVEPHP_APP_VERSION_CODE`
+
+- **Version name**: User-facing version string
+  - Android: `versionName` (e.g., "1.2.3")
+  - iOS: CFBundleShortVersionString (e.g., "1.2.3")
+  - Set via: `NATIVEPHP_APP_VERSION`
+
+## Requirements
+
+### Android (Google Play)
+
+You need a Google Cloud Service Account with Play Console access:
+
+1. Go to Google Cloud Console
+2. Create a service account
+3. Download JSON key
+4. Grant "Release Manager" access in Play Console
+5. Set path in `.env` or use `--google-service-key`
+
+### iOS (App Store Connect)
+
+You need App Store Connect API credentials:
+
+1. Go to App Store Connect > Users and Access > Keys
+2. Create an API key with "Developer" role
+3. Download `.p8` file
+4. Note the Key ID and Issuer ID
+5. Set in `.env` or use CLI options
+
+## Environment variables
+
+```env
+# Build number (shared for both platforms)
+NATIVEPHP_APP_VERSION_CODE=42
+
+# Android
+GOOGLE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
+
+# iOS
+APP_STORE_API_KEY_PATH=/path/to/AuthKey.p8
+APP_STORE_API_KEY_ID=ABC123XYZ
+APP_STORE_API_ISSUER_ID=xyz-issuer-id
+```
+
+## Common workflows
+
+### Before building for production
+
+Check and update build number before packaging:
+
+```bash
+php artisan native:check-build-number android --update
+php artisan native:package android --build-type=bundle
+```
+
+### Reserve build numbers
+
+Skip ahead to reserve numbers:
+
+```bash
+# Reserve 10 build numbers for internal testing
+php artisan native:check-build-number android --jump-by=10 --update
+```
+
+### CI/CD integration
+
+Automate in your deployment pipeline:
+
+```bash
+# Auto-update before building
+php artisan native:check-build-number both --update
+php artisan native:package android --build-type=bundle
+php artisan native:package ios
+```
+
+## Troubleshooting
+
+### "No releases found"
+
+This appears for new apps with no published builds. The suggested next build number is 1.
+
+### "Could not connect to Play Console"
+
+Check:
+- Service account JSON key is valid
+- Service account has "Release Manager" role
+- API is enabled in Google Cloud Console
+
+### "Could not connect to App Store Connect"
+
+Check:
+- API key file path is correct
+- Key ID and Issuer ID are correct
+- API key has "Developer" role
+
+## See also
+
+- [native:release](/cli/release) - Bump version name
+- [native:package](/cli/package) - Package with version

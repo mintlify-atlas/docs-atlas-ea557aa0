@@ -1,0 +1,337 @@
+---
+title: native:package
+description: Package signed Android/iOS apps for distribution
+---
+
+Creates production-ready, signed application packages for distribution to the Google Play Store or Apple App Store.
+
+## Syntax
+
+```bash
+php artisan native:package [platform] [options]
+```
+
+## Arguments
+
+### platform
+
+The platform to build for. Required (or use platform flags).
+
+- `android` or `a` - Package for Google Play Store
+- `ios` or `i` - Package for Apple App Store
+
+## Common Options
+
+### --ios
+
+Target iOS platform (shorthand for `platform=ios`).
+
+```bash
+php artisan native:package --ios
+```
+
+### --android
+
+Target Android platform (shorthand for `platform=android`).
+
+```bash
+php artisan native:package --android
+```
+
+### --build-type=TYPE
+
+Build type. Default: `release`
+
+- `release` - Signed APK (Android) or IPA (iOS)
+- `bundle` - Android App Bundle (AAB) for Play Store
+
+```bash
+php artisan native:package android --build-type=bundle
+```
+
+### --output=PATH
+
+Output directory for signed artifacts.
+
+```bash
+php artisan native:package android --output=./builds
+```
+
+### --skip-prepare
+
+Skip prepareAndroidBuild() to preserve existing project files.
+
+```bash
+php artisan native:package android --skip-prepare
+```
+
+## Android Signing Options
+
+### --keystore=PATH
+
+Path to Android keystore file (`.jks` or `.keystore`) for signing.
+
+```bash
+php artisan native:package android --keystore=./android.jks
+```
+
+Alternatively, set `ANDROID_KEYSTORE_FILE` in `.env`.
+
+### --keystore-password=PASSWORD
+
+Keystore password. Alternatively, set `ANDROID_KEYSTORE_PASSWORD` in `.env`.
+
+### --key-alias=ALIAS
+
+Key alias for signing. Alternatively, set `ANDROID_KEY_ALIAS` in `.env`.
+
+### --key-password=PASSWORD
+
+Key password. Alternatively, set `ANDROID_KEY_PASSWORD` in `.env`.
+
+### --fcm-key=KEY
+
+FCM Server Key for push notifications (optional). Alternatively, set `FCM_SERVER_KEY` in `.env`.
+
+### --google-service-key=PATH
+
+Google Service Account Key file path (required for Play Store upload). Alternatively, set `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env`.
+
+## iOS Signing Options
+
+### --api-key=PATH, --api-key-path=PATH
+
+Path to App Store Connect API key file (`.p8`).
+
+```bash
+php artisan native:package ios --api-key=./AuthKey.p8
+```
+
+Alternatively, set `APP_STORE_API_KEY_PATH` in `.env`.
+
+### --api-key-id=ID
+
+App Store Connect API key ID. Alternatively, set `APP_STORE_API_KEY_ID` in `.env`.
+
+### --api-issuer-id=ID
+
+App Store Connect API issuer ID. Alternatively, set `APP_STORE_API_ISSUER_ID` in `.env`.
+
+### --certificate-path=PATH
+
+Path to iOS distribution certificate (`.p12` or `.cer`).
+
+```bash
+php artisan native:package ios --certificate-path=./dist.p12
+```
+
+Alternatively, set `IOS_DISTRIBUTION_CERTIFICATE_PATH` in `.env`.
+
+### --certificate-password=PASSWORD
+
+iOS certificate password. Alternatively, set `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` in `.env`.
+
+### --provisioning-profile-path=PATH
+
+Path to provisioning profile (`.mobileprovision`).
+
+```bash
+php artisan native:package ios --provisioning-profile-path=./profile.mobileprovision
+```
+
+Alternatively, set `IOS_DISTRIBUTION_PROVISIONING_PROFILE_PATH` in `.env`.
+
+### --team-id=ID
+
+Apple Developer Team ID. Alternatively, set `IOS_TEAM_ID` in `.env`.
+
+### --export-method=METHOD
+
+iOS export method. Default: `app-store`
+
+- `app-store` - For App Store distribution
+- `ad-hoc` - For ad-hoc distribution
+- `enterprise` - For enterprise distribution
+- `development` - For development/testing
+
+```bash
+php artisan native:package ios --export-method=ad-hoc
+```
+
+### --validate-only
+
+Only validate the archive without exporting.
+
+```bash
+php artisan native:package ios --validate-only
+```
+
+### --validate-profile
+
+Validate iOS provisioning profile entitlements.
+
+```bash
+php artisan native:package ios --validate-profile
+```
+
+### --rebuild
+
+Force rebuild by removing existing archive.
+
+```bash
+php artisan native:package ios --rebuild
+```
+
+### --clean-caches
+
+Clear Xcode and SPM caches before building (iOS only).
+
+```bash
+php artisan native:package ios --clean-caches
+```
+
+## App Store Upload Options
+
+### --upload-to-app-store
+
+Upload iOS app to App Store Connect after packaging.
+
+```bash
+php artisan native:package ios --upload-to-app-store
+```
+
+Requires: `--api-key`, `--api-key-id`, `--api-issuer-id`
+
+### --test-upload
+
+Test upload existing IPA to App Store Connect (skip build).
+
+```bash
+php artisan native:package ios --test-upload
+```
+
+### --upload-to-play-store
+
+Upload Android app to Play Store after packaging.
+
+```bash
+php artisan native:package android --upload-to-play-store
+```
+
+Requires: `--google-service-key`
+
+### --play-store-track=TRACK
+
+Play Store track for upload. Default: `internal`
+
+- `internal` - Internal testing
+- `alpha` - Alpha testing
+- `beta` - Beta testing
+- `production` - Production release
+
+```bash
+php artisan native:package android --upload-to-play-store --play-store-track=beta
+```
+
+### --test-push=PATH
+
+Test Play Store upload with existing AAB file (skip build).
+
+```bash
+php artisan native:package android --test-push=./app-release.aab
+```
+
+### --jump-by=NUMBER
+
+Add extra number to the suggested version code (e.g., `--jump-by=10` to skip ahead).
+
+```bash
+php artisan native:package android --jump-by=10
+```
+
+### --no-tty
+
+Disable TTY mode for non-interactive environments.
+
+```bash
+php artisan native:package android --no-tty
+```
+
+## Examples
+
+### Package Android AAB for Play Store
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --keystore=./release.jks \
+  --keystore-password="your-password" \
+  --key-alias=release \
+  --key-password="your-key-password"
+```
+
+### Package and upload to Play Store
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --upload-to-play-store \
+  --play-store-track=internal
+```
+
+### Package iOS for App Store
+
+```bash
+php artisan native:package ios \
+  --api-key=./AuthKey.p8 \
+  --api-key-id=ABC123 \
+  --api-issuer-id=xyz-issuer-id
+```
+
+### Package and upload iOS to App Store Connect
+
+```bash
+php artisan native:package ios \
+  --upload-to-app-store \
+  --api-key=./AuthKey.p8
+```
+
+### Validate iOS provisioning profile
+
+```bash
+php artisan native:package ios --validate-profile --export-method=app-store
+```
+
+## Using environment variables
+
+Store credentials in `.env` to avoid exposing them in commands:
+
+```env
+# Android
+ANDROID_KEYSTORE_FILE=/path/to/keystore.jks
+ANDROID_KEYSTORE_PASSWORD=your-keystore-password
+ANDROID_KEY_ALIAS=release
+ANDROID_KEY_PASSWORD=your-key-password
+GOOGLE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
+
+# iOS
+APP_STORE_API_KEY_PATH=/path/to/AuthKey.p8
+APP_STORE_API_KEY_ID=ABC123XYZ
+APP_STORE_API_ISSUER_ID=xyz-issuer-id
+IOS_DISTRIBUTION_CERTIFICATE_PATH=/path/to/cert.p12
+IOS_DISTRIBUTION_CERTIFICATE_PASSWORD=cert-password
+IOS_TEAM_ID=TEAM123
+```
+
+Then simply run:
+
+```bash
+php artisan native:package android --build-type=bundle
+php artisan native:package ios --upload-to-app-store
+```
+
+## See also
+
+- [native:credentials](/cli/credentials) - Generate signing credentials
+- [native:release](/cli/release) - Bump version numbers
+- [native:check-build-number](/cli/check-build-number) - Sync build numbers with stores

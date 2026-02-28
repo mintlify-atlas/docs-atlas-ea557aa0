@@ -1,0 +1,168 @@
+---
+title: native:version
+description: Display the current NativePHP Mobile package version
+---
+
+Displays the currently installed version of the NativePHP Mobile package.
+
+## Syntax
+
+```bash
+php artisan native:version
+```
+
+## Examples
+
+### Check installed version
+
+```bash
+php artisan native:version
+```
+
+Output:
+```
+NativePHP Mobile: 3.2.1
+```
+
+## What it does
+
+Retrieves the package version from Composer's `installed.json` or the package's `composer.json` file.
+
+Shows:
+- Stable versions: `3.2.1`
+- Development versions: `dev-main`
+- Feature branches: `dev-feature-name`
+
+## Use cases
+
+### Verify installation
+
+After installing or updating:
+
+```bash
+composer require nativephp/mobile
+php artisan native:version
+```
+
+### Check for updates
+
+Compare your version with the latest release:
+
+```bash
+php artisan native:version
+# Compare with https://github.com/NativePHP/mobile/releases
+```
+
+### Debugging
+
+Include version info when reporting issues:
+
+```bash
+php artisan native:version
+php --version
+php artisan --version
+```
+
+### CI/CD
+
+Log version in deployment scripts:
+
+```bash
+echo "Building with NativePHP version:"
+php artisan native:version
+```
+
+## Version information
+
+### Semantic Versioning
+
+NativePHP Mobile follows [SemVer](https://semver.org/):
+
+- **Major** (3.x.x): Breaking changes
+- **Minor** (x.2.x): New features, backward compatible
+- **Patch** (x.x.1): Bug fixes, backward compatible
+
+### Development versions
+
+- `dev-main` - Latest development branch
+- `dev-v3` - Version 3 development branch
+- `dev-feature-name` - Feature branches
+
+### Version constraints in composer.json
+
+```json
+{
+  "require": {
+    "nativephp/mobile": "^3.0"  // 3.0 or higher, but less than 4.0
+  }
+}
+```
+
+## Updating NativePHP
+
+### Update to latest patch
+
+```bash
+composer update nativephp/mobile
+php artisan native:version
+```
+
+### Update to latest minor version
+
+Change `composer.json`:
+
+```json
+"nativephp/mobile": "^3.2"
+```
+
+Then:
+
+```bash
+composer update nativephp/mobile
+php artisan native:version
+```
+
+### Update to latest major version
+
+```bash
+composer require nativephp/mobile:^4.0
+php artisan native:version
+```
+
+**Warning**: Major version updates may have breaking changes. Check the [upgrade guide](https://github.com/NativePHP/mobile/releases) before upgrading.
+
+## Troubleshooting
+
+### "Unable to determine package version"
+
+Reinstall Composer dependencies:
+
+```bash
+composer install --no-scripts
+php artisan native:version
+```
+
+### Wrong version showing
+
+Clear Composer cache:
+
+```bash
+composer clear-cache
+composer install
+php artisan native:version
+```
+
+### Development version showing
+
+If you see `dev-main` but expect a stable version:
+
+```bash
+# Switch to stable version
+composer require nativephp/mobile:^3.0
+php artisan native:version
+```
+
+## See also
+
+- [Installation](/installation) - Installation guide
+- [Upgrade Guide](https://github.com/NativePHP/mobile/releases) - Version upgrade notes

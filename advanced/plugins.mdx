@@ -1,0 +1,260 @@
+---
+title: Plugin System
+description: Extend NativePHP Mobile with plugins that add native functionality
+---
+
+The NativePHP Mobile plugin system allows you to extend your app with native functionality through reusable packages. Plugins can add bridge functions, permissions, native dependencies, and platform-specific code.
+
+## How Plugins Work
+
+Plugins are discovered automatically from your Composer dependencies by scanning for packages with type `nativephp-plugin`. For security, plugins must be explicitly registered in your `NativeServiceProvider` to be loaded.
+
+### Plugin Discovery
+
+The plugin registry scans `vendor/composer/installed.json` for packages with:
+
+- Type: `nativephp-plugin`
+- A `nativephp.json` manifest file
+- Registered in your `NativeServiceProvider`
+
+```php
+use Native\Mobile\Plugins\PluginRegistry;
+
+$registry = PluginRegistry::getInstance();
+
+// Get all registered plugins
+$plugins = $registry->all();
+
+// Get all installed plugins (including unregistered)
+$allInstalled = $registry->allInstalled();
+
+// Get plugins that are installed but not registered
+$unregistered = $registry->unregistered();
+```
+
+### Security Model
+
+Plugins **must** be explicitly allowed in your `NativeServiceProvider` to prevent transitive dependencies from auto-registering potentially malicious code:
+
+```php
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+
+class NativeServiceProvider extends ServiceProvider
+{
+    /**
+     * Return an array of allowed plugin service provider classes.
+     */
+    public function plugins(): array
+    {
+        return [
+            \NativePHP\Haptics\HapticsServiceProvider::class,
+            \NativePHP\Biometrics\BiometricsServiceProvider::class,
+            // Add more plugins here
+        ];
+    }
+}
+```
+
+<Warning>
+If the `NativeServiceProvider` doesn't exist or the `plugins()` method is missing, **all plugins are blocked** by default for security.
+</Warning>
+
+## Installing Plugins
+
+<Steps>
+  <Step title="Install via Composer">
+    ```bash
+    composer require nativephp/plugin-haptics
+    ```
+  </Step>
+  
+  <Step title="Publish NativeServiceProvider (if not already published)">
+    ```bash
+    php artisan vendor:publish --tag=nativephp-provider
+    ```
+  </Step>
+  
+  <Step title="Register the plugin">
+    Add the plugin's service provider to the `plugins()` method in `app/Providers/NativeServiceProvider.php`:
+    
+    ```php
+    public function plugins(): array
+    {
+        return [
+            \NativePHP\Haptics\HapticsServiceProvider::class,
+        ];
+    }
+    ```
+  </Step>
+  
+  <Step title="Rebuild your app">
+    ```bash
+    php artisan native:install --force
+    php artisan native:run
+    ```
+  </Step>
+</Steps>
+
+## Plugin Commands
+
+NativePHP provides several commands for managing plugins:
+
+### List Plugins
+
+View all installed and registered plugins:
+
+```bash
+php artisan native:plugin:list
+```
+
+This shows:
+- Plugin name and version
+- Registration status
+- Bridge functions
+- Platform support (iOS/Android)
+- Permissions required
+
+### Register Plugin
+
+Quickly register a plugin without manually editing `NativeServiceProvider`:
+
+```bash
+php artisan native:plugin:register nativephp/plugin-haptics
+```
+
+### Validate Plugin
+
+Check if a plugin's manifest and structure are valid:
+
+```bash
+php artisan native:plugin:validate packages/vendor/plugin-name
+```
+
+### Uninstall Plugin
+
+Remove a plugin from your app:
+
+```bash
+php artisan native:plugin:uninstall nativephp/plugin-haptics
+```
+
+This removes the plugin from both Composer and your `NativeServiceProvider`.
+
+### Refresh Plugin Cache
+
+Clear the plugin discovery cache:
+
+```bash
+php artisan native:plugin:refresh
+```
+
+## What Plugins Can Do
+
+Plugins can add:
+
+- **Bridge Functions**: Native code callable from PHP/JavaScript
+- **Permissions**: Android permissions and iOS Info.plist entries
+- **Dependencies**: CocoaPods, Swift Packages, Gradle dependencies
+- **Native Code**: Kotlin (Android) and Swift (iOS) source files
+- **Events**: Laravel events dispatched from native code
+- **Assets**: ML models, fonts, images, and other resources
+- **Lifecycle Hooks**: Commands that run during the build process
+
+## Plugin Structure
+
+```
+plugin-haptics/
+├── composer.json          # Package definition
+├── nativephp.json        # Plugin manifest
+├── src/
+│   ├── HapticsServiceProvider.php
+│   ├── Haptics.php       # Main implementation
+│   ├── Facades/
+│   │   └── Haptics.php   # Facade
+│   ├── Events/
+│   │   └── HapticFeedbackCompleted.php
+│   └── Commands/
+│       └── CopyAssetsCommand.php
+├── resources/
+│   ├── android/
+│   │   └── HapticsFunctions.kt
+│   ├── ios/
+│   │   └── HapticsFunctions.swift
+│   └── js/
+│       └── haptics.js
+└── tests/
+    └── PluginTest.php
+```
+
+## Detecting Conflicts
+
+The plugin registry can detect conflicts between registered plugins:
+
+```php
+use Native\Mobile\Plugins\PluginRegistry;
+
+$registry = PluginRegistry::getInstance();
+$conflicts = $registry->detectConflicts();
+
+foreach ($conflicts as $conflict) {
+    echo "Conflict: {$conflict['type']} '{$conflict['value']}'\n";
+    echo "Between plugins: " . implode(', ', $conflict['plugins']) . "\n";
+}
+```
+
+Conflicts are detected for:
+- **Namespace collisions**: Two plugins using the same namespace
+- **Function collisions**: Two plugins registering the same bridge function name
+
+## Plugin Registry API
+
+The `PluginRegistry` provides methods for querying plugins:
+
+```php
+use Native\Mobile\Plugins\PluginRegistry;
+
+$registry = PluginRegistry::getInstance();
+
+// Check if a plugin is registered
+$registry->isRegistered('nativephp/plugin-haptics');
+
+// Find a specific plugin
+$plugin = $registry->find('nativephp/plugin-haptics');
+
+// Check if plugin exists
+$registry->has('nativephp/plugin-haptics');
+
+// Count registered plugins
+$count = $registry->count();
+
+// Get all bridge functions
+$functions = $registry->bridgeFunctions();
+
+// Get all Android permissions
+$permissions = $registry->androidPermissions();
+
+// Get all iOS Info.plist entries
+$infoPlist = $registry->iosInfoPlist();
+
+// Get plugins with Android native code
+$androidPlugins = $registry->withAndroidCode();
+
+// Get plugins with iOS native code
+$iosPlugins = $registry->withIosCode();
+
+// Get plugins with events
+$eventPlugins = $registry->withEvents();
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Custom Plugins" icon="code" href="/advanced/custom-plugins">
+    Learn how to build your own NativePHP plugins
+  </Card>
+  <Card title="Plugin Manifest" icon="file-lines" href="/advanced/custom-plugins#manifest-format">
+    Understand the nativephp.json format
+  </Card>
+</CardGroup>

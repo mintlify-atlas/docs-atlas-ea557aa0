@@ -1,0 +1,396 @@
+---
+title: Packaging Apps
+description: Package NativePHP apps for distribution on iOS and Android
+---
+
+## Overview
+
+The `native:package` command creates signed, production-ready builds of your mobile app. This process bundles your Laravel application, optimizes it for distribution, and signs it with your certificates for App Store or Play Store submission.
+
+## Packaging Process
+
+Packaging your app involves several automated steps:
+
+<Steps>
+  <Step title="Environment Preparation">
+    Your Laravel application is copied and prepared for mobile deployment. Unnecessary files are removed and environment variables are cleaned.
+  </Step>
+  
+  <Step title="Dependency Installation">
+    Production dependencies are installed (development dependencies are excluded by default).
+  </Step>
+  
+  <Step title="Asset Optimization">
+    The application is compressed and optimized for mobile distribution.
+  </Step>
+  
+  <Step title="Code Signing">
+    Your app is signed with your distribution certificates.
+  </Step>
+  
+  <Step title="Build Generation">
+    The final IPA (iOS) or APK/AAB (Android) file is created.
+  </Step>
+</Steps>
+
+## Basic Usage
+
+```bash
+# Package for Android
+php artisan native:package android
+php artisan native:package --android
+
+# Package for iOS
+php artisan native:package ios
+php artisan native:package --ios
+```
+
+You can use shorthand notation:
+
+```bash
+# Android shorthand
+php artisan native:package a
+
+# iOS shorthand
+php artisan native:package i
+```
+
+## Android Packaging
+
+### Signing Configuration
+
+Android apps require signing with a keystore:
+
+```bash
+php artisan native:package android \
+  --keystore=/path/to/keystore.jks \
+  --keystore-password=keystorepass \
+  --key-alias=mykey \
+  --key-password=keypass
+```
+
+**Environment Variables:**
+
+Store credentials securely in your `.env` file:
+
+```bash
+ANDROID_KEYSTORE_FILE=/path/to/keystore.jks
+ANDROID_KEYSTORE_PASSWORD=your_keystore_password
+ANDROID_KEY_ALIAS=your_key_alias
+ANDROID_KEY_PASSWORD=your_key_password
+```
+
+When environment variables are set, you can simply run:
+
+```bash
+php artisan native:package android
+```
+
+### Build Types
+
+Choose between APK and App Bundle:
+
+```bash
+# Release APK
+php artisan native:package android --build-type=release
+
+# App Bundle (AAB) - recommended for Play Store
+php artisan native:package android --build-type=bundle
+```
+
+**Build Type Differences:**
+
+| Type | Extension | Use Case | Size |
+|------|-----------|----------|------|
+| **Release** | `.apk` | Direct installation, testing | Larger |
+| **Bundle** | `.aab` | Play Store submission | Smaller |
+
+<Note>
+Google Play requires App Bundles (AAB) for new apps. Use `--build-type=bundle` for store submissions.
+</Note>
+
+### Custom Output Directory
+
+Specify where to save the build artifact:
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --output=/path/to/output
+```
+
+### Build Output
+
+After a successful build, you'll see:
+
+```
+Build output: /path/to/nativephp/android/app/build/outputs/bundle/release/app-release.aab
+File size: 24.5 MB
+```
+
+The output directory will open automatically on your system.
+
+## iOS Packaging
+
+### Signing Configuration
+
+iOS apps require App Store Connect API credentials and certificates:
+
+```bash
+php artisan native:package ios \
+  --api-key-path=/path/to/AuthKey_KEYID.p8 \
+  --api-key-id=YOUR_KEY_ID \
+  --api-issuer-id=YOUR_ISSUER_ID \
+  --team-id=YOUR_TEAM_ID
+```
+
+**Environment Variables:**
+
+```bash
+APP_STORE_API_KEY_PATH=/path/to/AuthKey_KEYID.p8
+APP_STORE_API_KEY_ID=YOUR_KEY_ID
+APP_STORE_API_ISSUER_ID=YOUR_ISSUER_ID
+IOS_TEAM_ID=YOUR_TEAM_ID
+```
+
+**Optional Certificate Configuration:**
+
+```bash
+IOS_DISTRIBUTION_CERTIFICATE_PATH=/path/to/cert.p12
+IOS_DISTRIBUTION_CERTIFICATE_PASSWORD=cert_password
+IOS_DISTRIBUTION_PROVISIONING_PROFILE_PATH=/path/to/profile.mobileprovision
+```
+
+### Export Methods
+
+Choose the appropriate export method:
+
+```bash
+# App Store distribution (default)
+php artisan native:package ios --export-method=app-store
+
+# Ad-hoc distribution
+php artisan native:package ios --export-method=ad-hoc
+
+# Enterprise distribution
+php artisan native:package ios --export-method=enterprise
+
+# Development distribution
+php artisan native:package ios --export-method=development
+```
+
+### Validate Archive Only
+
+Validate your app archive without exporting:
+
+```bash
+php artisan native:package ios --validate-only
+```
+
+### Force Rebuild
+
+Remove existing archive and rebuild:
+
+```bash
+php artisan native:package ios --rebuild
+```
+
+### Clean Caches
+
+Clear Xcode and Swift Package Manager caches before building:
+
+```bash
+php artisan native:package ios --clean-caches
+```
+
+## Environment Cleanup
+
+NativePHP automatically cleans sensitive data from your `.env` file during packaging to prevent secrets from being bundled with your app.
+
+### Cleanup Configuration
+
+Configure which environment keys to remove in `config/nativephp.php`:
+
+```php
+'cleanup_env_keys' => [
+    'AWS_*',
+    'GITHUB_*',
+    'DO_SPACES_*',
+    '*_SECRET',
+    'DB_PASSWORD',
+    'DB_USERNAME',
+],
+```
+
+**Wildcard Support:**
+- `AWS_*` - Removes all keys starting with `AWS_`
+- `*_SECRET` - Removes all keys ending with `_SECRET`
+- Exact matches like `DB_PASSWORD`
+
+### File Cleanup
+
+Specify files and directories to exclude:
+
+```php
+'cleanup_exclude_files' => [
+    'storage/framework/sessions',
+    'storage/framework/cache',
+    'storage/framework/testing',
+    'storage/logs/laravel.log',
+],
+```
+
+These files are removed before bundling to reduce app size and remove temporary data.
+
+## Version Management
+
+### Auto-Incrementing Build Numbers
+
+Build numbers are automatically incremented during packaging:
+
+```bash
+# Current: NATIVEPHP_APP_VERSION_CODE=42
+php artisan native:package android
+# After build: NATIVEPHP_APP_VERSION_CODE=43
+```
+
+The version code is updated in your `.env` file automatically.
+
+### Manual Version Bumping
+
+Use the `native:release` command to bump version numbers:
+
+```bash
+# Patch version (1.0.0 → 1.0.1)
+php artisan native:release patch
+
+# Minor version (1.0.1 → 1.1.0)
+php artisan native:release minor
+
+# Major version (1.1.0 → 2.0.0)
+php artisan native:release major
+```
+
+This updates `NATIVEPHP_APP_VERSION` in your `.env` file.
+
+### Version Configuration
+
+Versions are configured in `config/nativephp.php`:
+
+```php
+// Human-readable version (1.0.0)
+'version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+
+// Build number (must increase with each release)
+'version_code' => env('NATIVEPHP_APP_VERSION_CODE', 1),
+```
+
+**Android:**
+- `version` → `versionName` (displayed to users)
+- `version_code` → `versionCode` (must increase)
+
+**iOS:**
+- `version` → `CFBundleShortVersionString` (displayed to users)
+- `version_code` → `CFBundleVersion` (must increase)
+
+## CI/CD Integration
+
+### Non-Interactive Mode
+
+Disable TTY for automated builds:
+
+```bash
+php artisan native:package android --no-tty
+```
+
+### Skip Build Preparation
+
+Preserve existing project files (useful in some CI scenarios):
+
+```bash
+php artisan native:package android --skip-prepare
+```
+
+## Provisioning Profile Validation (iOS)
+
+Validate your provisioning profile entitlements:
+
+```bash
+php artisan native:package ios \
+  --validate-profile \
+  --export-method=app-store
+```
+
+This displays:
+- Profile name
+- Entitlements (push notifications, associated domains, etc.)
+- APS environment (development/production)
+- Bundle ID validation
+
+## Build Output Structure
+
+### Android
+
+```
+nativephp/android/app/build/outputs/
+├── apk/
+│   └── release/
+│       └── app-release.apk
+└── bundle/
+    └── release/
+        └── app-release.aab
+```
+
+### iOS
+
+```
+nativephp/ios/build/
+└── NativePHP.xcarchive
+```
+
+The exported IPA is typically saved to your output directory or the default build path.
+
+## Troubleshooting
+
+### Missing Signing Credentials
+
+```
+Missing required signing configuration
+  - --keystore (or ANDROID_KEYSTORE_FILE env var)
+```
+
+**Solution:** Provide all required signing parameters via flags or environment variables.
+
+### Keystore Not Found
+
+```
+Keystore file not found: /path/to/keystore.jks
+```
+
+**Solution:** Verify the keystore path is correct and the file exists.
+
+### Invalid Build Type
+
+```
+Build type must be either "release" or "bundle"
+```
+
+**Solution:** Use `--build-type=release` or `--build-type=bundle`.
+
+### iOS Certificate Validation Failed
+
+**Solution:** 
+- Ensure certificates haven't expired
+- Verify provisioning profile matches your certificate
+- Check team ID is correct
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="iOS Deployment" icon="apple" href="/build/ios-deployment">
+    Submit your iOS app to the App Store
+  </Card>
+  <Card title="Android Deployment" icon="android" href="/build/android-deployment">
+    Publish your Android app to Google Play
+  </Card>
+</CardGroup>

@@ -1,0 +1,506 @@
+---
+title: Geolocation
+description: Access device GPS location and manage location permissions.
+---
+
+The Geolocation API provides methods to retrieve the device's current GPS location, check location permission status, and request location permissions from the user.
+
+## Usage
+
+Get the device's current location:
+
+```php
+use Native\Mobile\Facades\Geolocation;
+
+Geolocation::getCurrentPosition();
+```
+
+Location data is returned asynchronously via the `LocationReceived` event.
+
+## Methods
+
+### `getCurrentPosition(bool $fineAccuracy = false)`
+
+Retrieve the device's current GPS location.
+
+**Parameters:**
+- `$fineAccuracy` (bool) - Use high accuracy GPS mode (default: `false`)
+
+**Returns:** `PendingGeolocation` - Fluent interface for configuring the request
+
+**Events:**
+- `Geolocation\LocationReceived` - Dispatched with location data
+
+**Example:**
+```php
+Geolocation::getCurrentPosition(true); // High accuracy
+```
+
+<Note>
+High accuracy mode uses GPS, which provides better precision but consumes more battery. Standard mode uses network-based location (WiFi/cellular) which is faster and more energy-efficient.
+</Note>
+
+### `checkPermissions()`
+
+Check the current location permission status.
+
+**Returns:** `PendingGeolocation` - Fluent interface for configuring the request
+
+**Events:**
+- `Geolocation\PermissionStatusReceived` - Dispatched with permission status
+
+**Example:**
+```php
+Geolocation::checkPermissions();
+```
+
+### `requestPermissions()`
+
+Request location permissions from the user.
+
+**Returns:** `PendingGeolocation` - Fluent interface for configuring the request
+
+**Events:**
+- `Geolocation\PermissionRequestResult` - Dispatched with the user's response
+
+**Example:**
+```php
+Geolocation::requestPermissions();
+```
+
+## Fluent API
+
+The `PendingGeolocation` class provides a fluent interface:
+
+### `id(string $id)`
+
+Set a unique identifier for the geolocation request.
+
+**Example:**
+```php
+Geolocation::getCurrentPosition()
+    ->id('user-location-request');
+```
+
+### `event(string $eventClass)`
+
+Dispatch a custom event instead of the default event.
+
+**Example:**
+```php
+Geolocation::getCurrentPosition()
+    ->event(MyCustomLocationEvent::class);
+```
+
+### `fineAccuracy(bool $fine = true)`
+
+Request high accuracy GPS location (only for `getCurrentPosition`).
+
+**Example:**
+```php
+Geolocation::getCurrentPosition()
+    ->fineAccuracy(true);
+```
+
+### `remember()`
+
+Store the request ID in the session for later retrieval.
+
+**Example:**
+```php
+Geolocation::getCurrentPosition()
+    ->remember();
+
+// Later
+$id = PendingGeolocation::lastId();
+```
+
+### `get()`
+
+Explicitly execute the geolocation operation (called automatically if not invoked).
+
+**Example:**
+```php
+Geolocation::getCurrentPosition()
+    ->fineAccuracy()
+    ->id('my-location')
+    ->get();
+```
+
+## Events
+
+### `Native\Mobile\Events\Geolocation\LocationReceived`
+
+Dispatched when location data is received.
+
+**Properties:**
+- `success` (bool) - Whether location was retrieved successfully
+- `latitude` (float|null) - Latitude coordinate
+- `longitude` (float|null) - Longitude coordinate
+- `accuracy` (float|null) - Location accuracy in meters
+- `timestamp` (int|null) - Unix timestamp of location reading
+- `provider` (string|null) - Location provider ('gps', 'network', 'fused')
+- `error` (string|null) - Error message if failed
+- `id` (string|null) - Request identifier if set
+
+**Example:**
+```php
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+class LocationListener
+{
+    public function handle(LocationReceived $event)
+    {
+        if ($event->success) {
+            Log::info('Location received', [
+                'lat' => $event->latitude,
+                'lng' => $event->longitude,
+                'accuracy' => $event->accuracy,
+                'provider' => $event->provider,
+            ]);
+        } else {
+            Log::error('Location error: ' . $event->error);
+        }
+    }
+}
+```
+
+### `Native\Mobile\Events\Geolocation\PermissionStatusReceived`
+
+Dispatched with the current permission status.
+
+### `Native\Mobile\Events\Geolocation\PermissionRequestResult`
+
+Dispatched with the result of a permission request.
+
+## Examples
+
+### Basic Location Retrieval
+
+```php
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+// Request location
+public function getLocation()
+{
+    Geolocation::getCurrentPosition()
+        ->fineAccuracy()
+        ->id('user-location');
+}
+
+// Handle location
+class LocationListener
+{
+    public function handle(LocationReceived $event)
+    {
+        if ($event->success) {
+            session([
+                'latitude' => $event->latitude,
+                'longitude' => $event->longitude,
+            ]);
+        }
+    }
+}
+```
+
+### Store Check-In Location
+
+```php
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+public function checkIn(Store $store)
+{
+    Geolocation::getCurrentPosition()
+        ->fineAccuracy()
+        ->id("checkin-{$store->id}")
+        ->remember();
+}
+
+class CheckInListener
+{
+    public function handle(LocationReceived $event)
+    {
+        $expectedId = PendingGeolocation::lastId();
+        
+        if ($event->id === $expectedId && $event->success) {
+            $storeId = str_replace('checkin-', '', $event->id);
+            
+            CheckIn::create([
+                'user_id' => auth()->id(),
+                'store_id' => $storeId,
+                'latitude' => $event->latitude,
+                'longitude' => $event->longitude,
+                'accuracy' => $event->accuracy,
+                'checked_in_at' => now(),
+            ]);
+        }
+    }
+}
+```
+
+### Permission Flow
+
+```php
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Events\Geolocation\PermissionStatusReceived;
+use Native\Mobile\Events\Geolocation\PermissionRequestResult;
+
+public function setupLocation()
+{
+    // First check if we already have permission
+    Geolocation::checkPermissions()->id('permission-check');
+}
+
+class PermissionStatusListener
+{
+    public function handle(PermissionStatusReceived $event)
+    {
+        if ($event->granted) {
+            // Permission already granted, get location
+            Geolocation::getCurrentPosition();
+        } else {
+            // Need to request permission
+            Geolocation::requestPermissions()->id('permission-request');
+        }
+    }
+}
+
+class PermissionRequestListener
+{
+    public function handle(PermissionRequestResult $event)
+    {
+        if ($event->granted) {
+            // Permission granted, now get location
+            Geolocation::getCurrentPosition();
+        } else {
+            // Permission denied
+            Dialog::alert(
+                'Location Required',
+                'This app needs location access to function properly.'
+            );
+        }
+    }
+}
+```
+
+### Nearby Places Finder
+
+```php
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Events\Geolocation\LocationReceived;
+use Illuminate\Support\Facades\Http;
+
+public function findNearbyPlaces(string $type = 'restaurant')
+{
+    Geolocation::getCurrentPosition()
+        ->id("nearby-{$type}")
+        ->remember();
+}
+
+class NearbyPlacesListener
+{
+    public function handle(LocationReceived $event)
+    {
+        if (!$event->success) {
+            return;
+        }
+        
+        $type = str_replace('nearby-', '', $event->id);
+        
+        // Query places API
+        $response = Http::get('https://api.example.com/places/nearby', [
+            'lat' => $event->latitude,
+            'lng' => $event->longitude,
+            'type' => $type,
+            'radius' => 5000, // 5km
+        ]);
+        
+        $places = $response->json()['results'];
+        
+        // Calculate distances
+        foreach ($places as &$place) {
+            $place['distance'] = $this->calculateDistance(
+                $event->latitude,
+                $event->longitude,
+                $place['lat'],
+                $place['lng']
+            );
+        }
+        
+        // Sort by distance
+        usort($places, fn($a, $b) => $a['distance'] <=> $b['distance']);
+        
+        session(['nearby_places' => $places]);
+    }
+    
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371; // km
+        
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        
+        $a = sin($dLat/2) * sin($dLat/2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($dLon/2) * sin($dLon/2);
+        
+        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+        
+        return $earthRadius * $c;
+    }
+}
+```
+
+### Delivery Tracking
+
+```php
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+class DeliveryTracker
+{
+    private $trackingActive = false;
+    
+    public function startTracking(Order $order)
+    {
+        $this->trackingActive = true;
+        $this->updateLocation($order);
+    }
+    
+    private function updateLocation(Order $order)
+    {
+        if (!$this->trackingActive) {
+            return;
+        }
+        
+        Geolocation::getCurrentPosition()
+            ->fineAccuracy()
+            ->id("delivery-{$order->id}");
+    }
+}
+
+class DeliveryLocationListener
+{
+    public function handle(LocationReceived $event)
+    {
+        if (!str_starts_with($event->id, 'delivery-')) {
+            return;
+        }
+        
+        if ($event->success) {
+            $orderId = str_replace('delivery-', '', $event->id);
+            
+            // Update delivery location in database
+            DeliveryLocation::create([
+                'order_id' => $orderId,
+                'latitude' => $event->latitude,
+                'longitude' => $event->longitude,
+                'accuracy' => $event->accuracy,
+                'timestamp' => $event->timestamp,
+            ]);
+            
+            // Broadcast to customer
+            broadcast(new DeliveryLocationUpdated($orderId, [
+                'lat' => $event->latitude,
+                'lng' => $event->longitude,
+            ]));
+        }
+    }
+}
+```
+
+### Geofencing
+
+```php
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+class GeofenceMonitor
+{
+    public function checkGeofence(Geofence $geofence)
+    {
+        Geolocation::getCurrentPosition()
+            ->id("geofence-{$geofence->id}");
+    }
+}
+
+class GeofenceListener
+{
+    public function handle(LocationReceived $event)
+    {
+        if (!str_starts_with($event->id, 'geofence-')) {
+            return;
+        }
+        
+        if (!$event->success) {
+            return;
+        }
+        
+        $geofenceId = str_replace('geofence-', '', $event->id);
+        $geofence = Geofence::find($geofenceId);
+        
+        $distance = $this->calculateDistance(
+            $event->latitude,
+            $event->longitude,
+            $geofence->latitude,
+            $geofence->longitude
+        );
+        
+        if ($distance <= $geofence->radius) {
+            // User entered geofence
+            event(new UserEnteredGeofence($geofence, auth()->user()));
+            
+            Dialog::toast("Welcome to {$geofence->name}!");
+        }
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+#### Permissions
+- Requires `NSLocationWhenInUseUsageDescription` in Info.plist
+- For background: `NSLocationAlwaysUsageDescription`
+- Two levels: "When In Use" and "Always"
+- Users can change permissions in Settings
+
+#### Accuracy
+- `fineAccuracy: false` - Network/WiFi location (faster, less battery)
+- `fineAccuracy: true` - GPS location (slower, more accurate, more battery)
+- Typical accuracy: 5-10m (GPS), 50-100m (network)
+
+#### Provider
+- Returns 'gps', 'network', or 'fused'
+- iOS automatically selects best provider
+
+### Android
+
+#### Permissions
+- Requires `ACCESS_COARSE_LOCATION` or `ACCESS_FINE_LOCATION`
+- Android 10+: Background requires `ACCESS_BACKGROUND_LOCATION`
+- Runtime permissions required (Android 6+)
+
+#### Accuracy
+- `fineAccuracy: false` - Coarse location (network-based)
+- `fineAccuracy: true` - Fine location (GPS-based)
+- Uses Fused Location Provider for best results
+
+#### Provider
+- Returns 'gps', 'network', or 'fused'
+- Fused provider combines GPS, WiFi, and cell tower data
+
+<Warning>
+Location requests can fail if the user has disabled location services at the system level. Always check `event.success` and handle errors gracefully.
+</Warning>
+
+<Note>
+High accuracy GPS location can take several seconds to acquire the first fix, especially indoors or with obstructed sky view. Consider showing a loading indicator to users.
+</Note>
+
+<Note>
+Location accuracy varies based on environment, device capabilities, and location provider. The `accuracy` property in the event indicates the estimated accuracy radius in meters.
+</Note>

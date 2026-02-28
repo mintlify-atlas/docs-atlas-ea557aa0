@@ -1,0 +1,326 @@
+---
+title: Network
+description: Check device network connectivity status and connection type
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Network;
+```
+
+## Methods
+
+### status()
+
+Get the current network status including connectivity state and connection type.
+
+```php
+use Native\Mobile\Facades\Network;
+
+$status = Network::status();
+
+if ($status) {
+    $isConnected = $status->connected;
+    $type = $status->type; // 'wifi', 'cellular', 'ethernet', 'unknown'
+    $isExpensive = $status->isExpensive; // iOS only
+    $isConstrained = $status->isConstrained; // iOS only
+}
+```
+
+<ResponseField name="return" type="object|null">
+  Network status object, or null if unavailable
+</ResponseField>
+
+**Returned object properties:**
+- `connected` (bool) - Whether device is connected to a network
+- `type` (string) - Connection type: `'wifi'`, `'cellular'`, `'ethernet'`, or `'unknown'`
+- `isExpensive` (bool) - Whether connection is metered/cellular (iOS only)
+- `isConstrained` (bool) - Whether Low Data Mode is enabled (iOS only)
+
+## Examples
+
+### Check Connectivity Before Upload
+
+```php
+use Native\Mobile\Facades\Network;
+use Native\Mobile\Facades\Dialog;
+
+class FileUploader
+{
+    public function uploadFile(string $filePath)
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            Dialog::alert(
+                'No Connection',
+                'Please connect to the internet to upload files.',
+                ['OK']
+            );
+            return;
+        }
+        
+        // Check file size and connection type
+        $fileSize = filesize($filePath);
+        $isLargeFile = $fileSize > 10 * 1024 * 1024; // > 10MB
+        
+        if ($isLargeFile && $network->type === 'cellular') {
+            Dialog::alert(
+                'Large File',
+                'This file is large. Consider using WiFi to avoid data charges.',
+                ['Upload Anyway', 'Cancel']
+            )->id('upload-warning');
+            return;
+        }
+        
+        $this->performUpload($filePath);
+    }
+}
+```
+
+### Smart Download Manager
+
+```php
+use Native\Mobile\Facades\Network;
+
+class DownloadManager
+{
+    public function downloadMedia(string $url, int $sizeBytes)
+    {
+        $network = Network::status();
+        
+        if (!$network->connected) {
+            return $this->queueForLater($url);
+        }
+        
+        // Only auto-download large files on WiFi
+        if ($sizeBytes > 5 * 1024 * 1024 && $network->type !== 'wifi') {
+            Dialog::alert(
+                'WiFi Recommended',
+                'This file is large. Download on cellular data?',
+                ['Download', 'Wait for WiFi']
+            )->id('download-' . md5($url));
+            return;
+        }
+        
+        $this->performDownload($url);
+    }
+    
+    public function shouldAutoSync(): bool
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            return false;
+        }
+        
+        // Only auto-sync on WiFi or when not in low data mode
+        return $network->type === 'wifi' || !($network->isConstrained ?? false);
+    }
+}
+```
+
+### Network Status Monitor
+
+```php
+use Native\Mobile\Facades\Network;
+use Livewire\Component;
+
+class NetworkStatus extends Component
+{
+    public $isOnline = true;
+    public $connectionType = 'unknown';
+    public $statusMessage = '';
+    
+    public function mount()
+    {
+        $this->checkNetwork();
+    }
+    
+    public function checkNetwork()
+    {
+        $network = Network::status();
+        
+        if (!$network) {
+            $this->isOnline = false;
+            $this->statusMessage = 'Unable to detect network';
+            return;
+        }
+        
+        $this->isOnline = $network->connected;
+        $this->connectionType = $network->type;
+        
+        $this->statusMessage = match(true) {
+            !$network->connected => 'Offline',
+            $network->type === 'wifi' => 'Connected via WiFi',
+            $network->type === 'cellular' => 'Connected via Cellular',
+            $network->type === 'ethernet' => 'Connected via Ethernet',
+            default => 'Connected',
+        };
+        
+        if ($network->isConstrained ?? false) {
+            $this->statusMessage .= ' (Low Data Mode)';
+        }
+    }
+    
+    public function render()
+    {
+        return view('livewire.network-status');
+    }
+}
+```
+
+### Media Quality Selector
+
+```php
+use Native\Mobile\Facades\Network;
+
+class MediaQualitySelector
+{
+    public function getRecommendedQuality(): string
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            return 'offline';
+        }
+        
+        return match($network->type) {
+            'wifi' => 'high',
+            'cellular' => ($network->isExpensive ?? false) ? 'medium' : 'high',
+            'ethernet' => 'high',
+            default => 'low',
+        };
+    }
+    
+    public function getVideoUrl(string $videoId): string
+    {
+        $quality = $this->getRecommendedQuality();
+        
+        return match($quality) {
+            'high' => "https://cdn.example.com/videos/{$videoId}/1080p.mp4",
+            'medium' => "https://cdn.example.com/videos/{$videoId}/720p.mp4",
+            'low' => "https://cdn.example.com/videos/{$videoId}/480p.mp4",
+            default => "https://cdn.example.com/videos/{$videoId}/360p.mp4",
+        };
+    }
+}
+```
+
+### Offline Mode Handler
+
+```php
+use Native\Mobile\Facades\Network;
+
+class OfflineHandler
+{
+    private array $pendingActions = [];
+    
+    public function performAction(callable $action, string $actionId)
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            // Queue action for when online
+            $this->pendingActions[$actionId] = $action;
+            Dialog::toast('Action queued - will sync when online');
+            return;
+        }
+        
+        // Execute immediately
+        $action();
+    }
+    
+    public function processPendingActions(): void
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            return;
+        }
+        
+        foreach ($this->pendingActions as $actionId => $action) {
+            try {
+                $action();
+                unset($this->pendingActions[$actionId]);
+            } catch (\Exception $e) {
+                Log::error("Failed to process pending action {$actionId}", [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+    }
+}
+```
+
+### Connection Type Indicator
+
+```php
+use Native\Mobile\Facades\Network;
+
+class ConnectionIndicator
+{
+    public function getIcon(): string
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            return '⚠️ Offline';
+        }
+        
+        return match($network->type) {
+            'wifi' => '📶 WiFi',
+            'cellular' => '📱 Cellular',
+            'ethernet' => '🔌 Ethernet',
+            default => '🌐 Online',
+        };
+    }
+    
+    public function shouldWarnAboutData(): bool
+    {
+        $network = Network::status();
+        
+        return $network &&
+               $network->connected &&
+               ($network->type === 'cellular' || ($network->isExpensive ?? false));
+    }
+}
+```
+
+### Bandwidth-Aware Sync
+
+```php
+use Native\Mobile\Facades\Network;
+
+class SyncManager
+{
+    public function sync(): void
+    {
+        $network = Network::status();
+        
+        if (!$network || !$network->connected) {
+            Log::info('Sync skipped - offline');
+            return;
+        }
+        
+        if ($network->isConstrained ?? false) {
+            // Low data mode - sync only critical data
+            $this->syncCritical();
+            Log::info('Partial sync (Low Data Mode)');
+            return;
+        }
+        
+        if ($network->type === 'cellular' && ($network->isExpensive ?? false)) {
+            // Cellular - sync essentials only
+            $this->syncEssentials();
+            Log::info('Essential sync (cellular)');
+            return;
+        }
+        
+        // WiFi or unlimited - full sync
+        $this->syncAll();
+        Log::info('Full sync (WiFi)');
+    }
+}
+```

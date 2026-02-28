@@ -1,0 +1,633 @@
+---
+title: App Lifecycle & Events
+description: Understanding the app lifecycle and responding to native events
+---
+
+NativePHP Mobile dispatches Laravel events throughout the app lifecycle and when native features are used. This allows your application to respond to device-level events just like any other Laravel event.
+
+## Listening to Events
+
+You can listen to NativePHP events in several ways:
+
+### Event Listeners
+
+Register listeners in `EventServiceProvider`:
+
+```php
+use Native\Mobile\Events\Camera\PhotoTaken;
+use App\Listeners\ProcessPhoto;
+
+protected $listen = [
+    PhotoTaken::class => [
+        ProcessPhoto::class,
+    ],
+];
+```
+
+### Livewire Components
+
+Use the `#[On]` attribute to listen in Livewire components:
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+class PhotoUploader extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+    public function photoTaken($path, $mimeType, $id)
+    {
+        // Handle the photo
+        $this->uploadPhoto($path);
+    }
+}
+```
+
+<Note>
+Notice the `native:` prefix and double-escaped backslashes when using the `#[On]` attribute with NativePHP events.
+</Note>
+
+### Closure Listeners
+
+Register inline listeners in a service provider:
+
+```php
+use Illuminate\Support\Facades\Event;
+use Native\Mobile\Events\Scanner\CodeScanned;
+
+Event::listen(function (CodeScanned $event) {
+    Log::info('QR Code scanned', [
+        'data' => $event->data,
+        'format' => $event->format,
+    ]);
+});
+```
+
+## Application Lifecycle Events
+
+### UpdateInstalled
+
+Dispatched when an app update is installed on the device.
+
+<CodeGroup>
+```php Event Definition
+namespace Native\Mobile\Events\App;
+
+class UpdateInstalled
+{
+    public function __construct(
+        public readonly string $version,
+        public readonly int $timestamp
+    ) {}
+}
+```
+
+```php Example Usage
+use Native\Mobile\Events\App\UpdateInstalled;
+
+Event::listen(function (UpdateInstalled $event) {
+    Log::info('App updated to version ' . $event->version);
+    
+    // Run any post-update migrations or cleanup
+    Cache::flush();
+});
+```
+</CodeGroup>
+
+<ParamField path="version" type="string">
+  The new version number that was installed
+</ParamField>
+
+<ParamField path="timestamp" type="int">
+  Unix timestamp when the update was installed
+</ParamField>
+
+## Camera Events
+
+Events dispatched when using the camera APIs.
+
+### PhotoTaken
+
+Dispatched when a photo is successfully captured.
+
+<CodeGroup>
+```php Event Definition  
+namespace Native\Mobile\Events\Camera;
+
+class PhotoTaken
+{
+    public function __construct(
+        public string $path,
+        public string $mimeType = 'image/jpeg',
+        public ?string $id = null
+    ) {}
+}
+```
+
+```php Example Usage
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+#[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+public function handlePhoto($path, $mimeType, $id)
+{
+    // Process the photo from temp storage
+    $photo = Storage::disk('temp')->get($path);
+    
+    // Move to permanent storage
+    Storage::disk('mobile_public')->put(
+        'photos/' . basename($path),
+        $photo
+    );
+}
+```
+</CodeGroup>
+
+<ParamField path="path" type="string">
+  Path to the captured photo in temp storage
+</ParamField>
+
+<ParamField path="mimeType" type="string" default="image/jpeg">
+  MIME type of the image
+</ParamField>
+
+<ParamField path="id" type="string | null">
+  Optional identifier passed when calling the camera
+</ParamField>
+
+### PhotoCancelled
+
+Dispatched when the user cancels photo capture.
+
+```php
+namespace Native\Mobile\Events\Camera;
+
+class PhotoCancelled
+{
+    public function __construct(
+        public ?string $id = null
+    ) {}
+}
+```
+
+### VideoRecorded
+
+Dispatched when a video is successfully recorded.
+
+```php
+namespace Native\Mobile\Events\Camera;
+
+class VideoRecorded
+{
+    public function __construct(
+        public string $path,
+        public string $mimeType = 'video/mp4',
+        public ?string $id = null
+    ) {}
+}
+```
+
+### VideoCancelled
+
+Dispatched when the user cancels video recording.
+
+```php
+namespace Native\Mobile\Events\Camera;
+
+class VideoCancelled
+{
+    public function __construct(
+        public ?string $id = null
+    ) {}
+}
+```
+
+### PermissionDenied
+
+Dispatched when camera permission is denied by the user.
+
+```php
+namespace Native\Mobile\Events\Camera;
+
+class PermissionDenied
+{
+    public function __construct(
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Scanner Events
+
+Events for QR code and barcode scanning.
+
+### CodeScanned
+
+Dispatched when a code is successfully scanned.
+
+<CodeGroup>
+```php Event Definition
+namespace Native\Mobile\Events\Scanner;
+
+class CodeScanned
+{
+    public function __construct(
+        public string $data,
+        public string $format,
+        public ?string $id = null
+    ) {}
+}
+```
+
+```php Example Usage
+use Native\Mobile\Events\Scanner\CodeScanned;
+
+Event::listen(function (CodeScanned $event) {
+    if ($event->format === 'QR_CODE') {
+        // Process QR code data
+        $url = $event->data;
+        return redirect($url);
+    }
+});
+```
+</CodeGroup>
+
+<ParamField path="data" type="string">
+  The scanned data (URL, text, etc.)
+</ParamField>
+
+<ParamField path="format" type="string">
+  Barcode format (e.g., `QR_CODE`, `EAN_13`, `CODE_128`)
+</ParamField>
+
+<ParamField path="id" type="string | null">
+  Optional identifier passed when calling the scanner
+</ParamField>
+
+### ScannerCancelled
+
+Dispatched when the user cancels scanning.
+
+```php
+namespace Native\Mobile\Events\Scanner;
+
+class ScannerCancelled
+{
+    public function __construct(
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Geolocation Events
+
+### LocationReceived
+
+Dispatched when location data is received from the device.
+
+<CodeGroup>
+```php Event Definition
+namespace Native\Mobile\Events\Geolocation;
+
+class LocationReceived
+{
+    public function __construct(
+        public bool $success,
+        public ?float $latitude = null,
+        public ?float $longitude = null,
+        public ?float $accuracy = null,
+        public ?int $timestamp = null,
+        public ?string $provider = null,
+        public ?string $error = null,
+        public ?string $id = null
+    ) {}
+}
+```
+
+```php Example Usage
+use Native\Mobile\Events\Geolocation\LocationReceived;
+
+Event::listen(function (LocationReceived $event) {
+    if ($event->success) {
+        Log::info('Location received', [
+            'lat' => $event->latitude,
+            'lng' => $event->longitude,
+            'accuracy' => $event->accuracy . 'm',
+        ]);
+    } else {
+        Log::error('Location error: ' . $event->error);
+    }
+});
+```
+</CodeGroup>
+
+<ParamField path="success" type="bool">
+  Whether location was successfully retrieved
+</ParamField>
+
+<ParamField path="latitude" type="float | null">
+  Latitude coordinate
+</ParamField>
+
+<ParamField path="longitude" type="float | null">
+  Longitude coordinate
+</ParamField>
+
+<ParamField path="accuracy" type="float | null">
+  Accuracy in meters
+</ParamField>
+
+<ParamField path="timestamp" type="int | null">
+  Unix timestamp of the location fix
+</ParamField>
+
+<ParamField path="provider" type="string | null">
+  Location provider (e.g., `gps`, `network`)
+</ParamField>
+
+<ParamField path="error" type="string | null">
+  Error message if `success` is false
+</ParamField>
+
+### PermissionRequestResult
+
+Dispatched after requesting location permission.
+
+```php
+namespace Native\Mobile\Events\Geolocation;
+
+class PermissionRequestResult
+{
+    public function __construct(
+        public bool $granted,
+        public ?string $id = null
+    ) {}
+}
+```
+
+### PermissionStatusReceived
+
+Dispatched when checking current location permission status.
+
+```php
+namespace Native\Mobile\Events\Geolocation;
+
+class PermissionStatusReceived
+{
+    public function __construct(
+        public bool $granted,
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Alert Events
+
+### ButtonPressed
+
+Dispatched when a user taps a button in a native alert dialog.
+
+<CodeGroup>
+```php Event Definition
+namespace Native\Mobile\Events\Alert;
+
+class ButtonPressed
+{
+    public function __construct(
+        public int $index,
+        public string $label,
+        public ?string $id = null
+    ) {}
+}
+```
+
+```php Example Usage
+use Native\Mobile\Events\Alert\ButtonPressed;
+
+Event::listen(function (ButtonPressed $event) {
+    if ($event->index === 0) {
+        // User pressed first button (often "Cancel")
+        return;
+    }
+    
+    // User confirmed action
+    $this->deleteAccount();
+});
+```
+</CodeGroup>
+
+<ParamField path="index" type="int">
+  Zero-based index of the pressed button
+</ParamField>
+
+<ParamField path="label" type="string">
+  Text label of the pressed button
+</ParamField>
+
+## Biometric Events
+
+### Completed
+
+Dispatched after biometric authentication attempt.
+
+```php
+namespace Native\Mobile\Events\Biometric;
+
+class Completed
+{
+    public function __construct(
+        public bool $success,
+        public ?string $error = null,
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Gallery Events
+
+### MediaSelected
+
+Dispatched when user selects media from the gallery.
+
+```php
+namespace Native\Mobile\Events\Gallery;
+
+class MediaSelected
+{
+    public function __construct(
+        public array $files,
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Microphone Events
+
+### MicrophoneRecorded
+
+Dispatched when audio recording is completed.
+
+```php
+namespace Native\Mobile\Events\Microphone;
+
+class MicrophoneRecorded
+{
+    public function __construct(
+        public string $path,
+        public ?string $id = null
+    ) {}
+}
+```
+
+### MicrophoneCancelled
+
+Dispatched when user cancels audio recording.
+
+```php
+namespace Native\Mobile\Events\Microphone;
+
+class MicrophoneCancelled
+{
+    public function __construct(
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Push Notification Events
+
+### TokenGenerated
+
+Dispatched when a push notification token is generated.
+
+```php
+namespace Native\Mobile\Events\PushNotification;
+
+class TokenGenerated
+{
+    public function __construct(
+        public string $token,
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Wallet Events
+
+Events for mobile payment processing (Apple Pay, Google Pay).
+
+### PaymentCompleted
+
+Dispatched when payment is successfully completed.
+
+```php
+namespace Native\Mobile\Events\Wallet;
+
+class PaymentCompleted
+{
+    public function __construct(
+        public array $data,
+        public ?string $id = null
+    ) {}
+}
+```
+
+### PaymentCancelled
+
+Dispatched when user cancels payment.
+
+```php
+namespace Native\Mobile\Events\Wallet;
+
+class PaymentCancelled
+{
+    public function __construct(
+        public ?string $id = null
+    ) {}
+}
+```
+
+### PaymentFailed
+
+Dispatched when payment fails.
+
+```php
+namespace Native\Mobile\Events\Wallet;
+
+class PaymentFailed
+{
+    public function __construct(
+        public string $error,
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Event ID Pattern
+
+Most events include an optional `$id` parameter. Use this to track which action triggered the event when you have multiple instances:
+
+```php
+// Trigger camera with ID
+Camera::takePhoto(['id' => 'profile-photo']);
+
+// Listen for that specific photo
+#[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+public function photoTaken($path, $mimeType, $id)
+{
+    if ($id === 'profile-photo') {
+        $this->updateProfilePhoto($path);
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+**Queue long-running tasks**: Event listeners should be fast. If you need to process large files or make API calls, dispatch a queued job instead.
+</Tip>
+
+```php
+use Native\Mobile\Events\Camera\PhotoTaken;
+use App\Jobs\ProcessPhoto;
+
+Event::listen(function (PhotoTaken $event) {
+    ProcessPhoto::dispatch($event->path);
+});
+```
+
+<Warning>
+**Handle failures gracefully**: Native events can fail (permissions denied, user cancels, etc.). Always implement cancellation and error event handlers.
+</Warning>
+
+```php
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Native\Mobile\Events\Camera\PhotoCancelled;
+use Native\Mobile\Events\Camera\PermissionDenied;
+
+// Success case
+Event::listen(fn(PhotoTaken $e) => $this->processPhoto($e->path));
+
+// User cancelled
+Event::listen(fn(PhotoCancelled $e) => $this->showMessage('Photo cancelled'));
+
+// Permission denied
+Event::listen(fn(PermissionDenied $e) => $this->promptForPermission());
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Camera" icon="camera" href="/features/camera">
+    Learn about camera APIs and events
+  </Card>
+  <Card title="Scanner" icon="qrcode" href="/features/scanner">
+    QR code and barcode scanning
+  </Card>
+  <Card title="Geolocation" icon="location-dot" href="/features/geolocation">
+    Access device location
+  </Card>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Configure app behavior
+  </Card>
+</CardGroup>

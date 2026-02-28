@@ -1,0 +1,108 @@
+---
+title: native:install
+description: Install all of the NativePHP resources
+---
+
+Initializes your Laravel application with NativePHP Mobile by installing platform-specific resources and configuring your development environment.
+
+## Syntax
+
+```bash
+php artisan native:install [platform] [options]
+```
+
+## Arguments
+
+### platform
+
+The platform to install. Optional.
+
+- `android` - Install Android resources only
+- `ios` - Install iOS resources only (macOS required)
+- `both` - Install both platforms
+
+If not specified, you'll be prompted to choose (on macOS) or Android will be installed automatically (on Windows/Linux).
+
+## Options
+
+### --force, -F, --fresh
+
+Overwrite existing files and directories.
+
+```bash
+php artisan native:install --force
+```
+
+### --with-icu
+
+Include ICU (International Components for Unicode) support for Android. Adds approximately 30MB to the final app size.
+
+```bash
+php artisan native:install android --with-icu
+```
+
+### --without-icu
+
+Explicitly exclude ICU support for Android.
+
+```bash
+php artisan native:install android --without-icu
+```
+
+### --skip-php
+
+Do not download the PHP binaries during installation.
+
+```bash
+php artisan native:install --skip-php
+```
+
+## Examples
+
+### Install both platforms (macOS only)
+
+```bash
+php artisan native:install both
+```
+
+### Install Android only with ICU support
+
+```bash
+php artisan native:install android --with-icu
+```
+
+### Reinstall iOS, overwriting existing files
+
+```bash
+php artisan native:install ios --force
+```
+
+### Quick install with defaults
+
+```bash
+php artisan native:install
+```
+
+## What it does
+
+1. **Prompts for App ID**: If `NATIVEPHP_APP_ID` is not set in your `.env` file, you'll be asked to provide a bundle identifier (e.g., `com.example.myapp`)
+2. **Creates directories**: Sets up `nativephp/` directory structure in your project
+3. **Downloads resources**: Installs platform-specific build tools and PHP binaries
+4. **Publishes assets**: Copies templates and configuration files
+5. **Configures project**: Sets up Android Studio/Xcode project files
+6. **Creates CLI wrapper**: Adds the `native` executable to your project root
+
+## Platform requirements
+
+**Android**
+- Not supported in WSL (Windows Subsystem for Linux)
+- Requires native Windows, Linux, or macOS
+
+**iOS**
+- Only available on macOS
+- Requires Xcode installed
+
+## See also
+
+- [native:run](/cli/run) - Build and run your app
+- [native:package](/cli/package) - Package for distribution

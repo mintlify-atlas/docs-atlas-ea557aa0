@@ -1,0 +1,194 @@
+---
+title: Haptics
+description: Trigger haptic feedback and device vibration.
+---
+
+The Haptics API provides a simple method to trigger haptic vibration feedback on the device.
+
+<Note>
+**Deprecation Notice:** As of version 2.0.0, `Haptics::vibrate()` has been deprecated in favor of `Device::vibrate()`. Both methods currently work the same way, but it's recommended to use the Device facade for future compatibility.
+</Note>
+
+## Usage
+
+Trigger a haptic vibration:
+
+```php
+use Native\Mobile\Facades\Haptics;
+
+Haptics::vibrate();
+```
+
+**Recommended (v2.0+):**
+```php
+use Native\Mobile\Facades\Device;
+
+Device::vibrate();
+```
+
+## Methods
+
+### `vibrate()`
+
+**Deprecated:** Use `Device::vibrate()` instead.
+
+Trigger a short haptic vibration on the device.
+
+**Returns:** `void`
+
+**Example:**
+```php
+Haptics::vibrate();
+```
+
+## Migration Guide
+
+If you're using `Haptics::vibrate()` in your code, update to use `Device::vibrate()` instead:
+
+**Before:**
+```php
+use Native\Mobile\Facades\Haptics;
+
+Haptics::vibrate();
+```
+
+**After:**
+```php
+use Native\Mobile\Facades\Device;
+
+Device::vibrate();
+```
+
+## Examples
+
+### Button Press Feedback
+
+```php
+use Native\Mobile\Facades\Device;
+
+public function handleButtonPress()
+{
+    // Provide haptic feedback
+    Device::vibrate();
+    
+    // Process button action
+    $this->performAction();
+}
+```
+
+### Form Submission
+
+```php
+use Native\Mobile\Facades\Device;
+
+public function submitForm(Request $request)
+{
+    $validated = $request->validate([...]);
+    
+    $success = $this->saveData($validated);
+    
+    if ($success) {
+        // Success feedback
+        Device::vibrate();
+        
+        return response()->json([
+            'message' => 'Form submitted successfully'
+        ]);
+    }
+}
+```
+
+### Error Notification
+
+```php
+use Native\Mobile\Facades\Device;
+use Native\Mobile\Facades\Dialog;
+
+public function handleError(\Exception $e)
+{
+    // Provide haptic feedback for error
+    Device::vibrate();
+    
+    // Show error dialog
+    Dialog::alert(
+        'Error',
+        $e->getMessage()
+    );
+}
+```
+
+### Game Interaction
+
+```php
+use Native\Mobile\Facades\Device;
+
+class GameController
+{
+    public function playerHit()
+    {
+        // Vibrate on hit
+        Device::vibrate();
+        
+        $this->decreaseHealth();
+    }
+    
+    public function playerScored()
+    {
+        // Vibrate on score
+        Device::vibrate();
+        
+        $this->incrementScore();
+    }
+}
+```
+
+### Notification Received
+
+```php
+use Native\Mobile\Facades\Device;
+
+class NotificationHandler
+{
+    public function handleNotification($notification)
+    {
+        // Vibrate for important notifications
+        if ($notification->priority === 'high') {
+            Device::vibrate();
+        }
+        
+        $this->displayNotification($notification);
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+- Uses `AudioServicesPlaySystemSound` with `kSystemSoundID_Vibrate`
+- Produces a single, short vibration (approximately 400ms)
+- Duration and pattern cannot be customized
+- Not available on devices without vibration motor (e.g., iPad)
+- Respects user's haptic feedback settings
+- Silent mode does not affect vibration
+
+### Android
+
+- Uses `Vibrator` system service
+- Default vibration duration: 200-400ms (device dependent)
+- Duration and pattern cannot be customized via this API
+- Requires `VIBRATE` permission in AndroidManifest.xml
+- Respects user's vibration settings
+- Works in silent mode
+
+<Note>
+The vibration pattern and duration are controlled by the operating system and may vary between devices. This API triggers a simple, short vibration pulse.
+</Note>
+
+<Warning>
+Some devices (particularly tablets) may not have a vibration motor. The method will execute without error, but no vibration will occur. Always consider this when designing your user experience.
+</Warning>
+
+<Note>
+For more advanced haptic feedback patterns, consider using platform-specific implementations through native bridges. This API provides a simple, cross-platform vibration trigger.
+</Note>

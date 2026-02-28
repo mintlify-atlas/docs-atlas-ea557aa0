@@ -1,0 +1,482 @@
+---
+title: Wallet
+description: Accept payments using Apple Pay and Google Pay via Stripe
+---
+
+The Wallet API provides native mobile payment integration through Apple Pay (iOS) and Google Pay (Android) using Stripe as the payment processor.
+
+<Note>
+This feature requires a Stripe account and proper configuration for Apple Pay and Google Pay.
+</Note>
+
+## Usage
+
+Process a payment using native mobile wallets:
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+// Check if wallet is available
+if (MobileWallet::isAvailable()) {
+    // Create payment intent
+    $intent = MobileWallet::createPaymentIntent(
+        amount: 2999, // $29.99 in cents
+        currency: 'usd'
+    );
+
+    // Present payment sheet
+    $result = MobileWallet::presentPaymentSheet(
+        clientSecret: $intent->client_secret,
+        merchantDisplayName: 'Your Store Name',
+        publishableKey: config('services.stripe.key'),
+        merchantId: 'merchant.com.yourapp'
+    );
+}
+```
+
+## Checking Availability
+
+Before attempting to use mobile wallets, check if they're available:
+
+```php
+use Native\Mobile\Facades\MobileWallet;
+
+if (MobileWallet::isAvailable()) {
+    // Apple Pay or Google Pay is set up and ready
+    // Show wallet payment button
+} else {
+    // Wallet not available on this device
+    // Show alternative payment methods
+}
+```
+
+A wallet might not be available if:
+- Device doesn't support it (older devices)
+- User hasn't set up a payment method in their wallet
+- Feature is disabled in device settings
+
+## Payment Flow
+
+The complete payment flow involves several steps:
+
+### 1. Create Payment Intent
+
+First, create a Stripe payment intent on your server:
+
+```php
+$intent = MobileWallet::createPaymentIntent(
+    amount: 5000, // $50.00 in cents
+    currency: 'usd',
+    metadata: [
+        'user_id' => auth()->id(),
+        'order_id' => $order->id,
+    ]
+);
+
+$clientSecret = $intent->client_secret;
+```
+
+### 2. Present Payment Sheet
+
+Show the native payment sheet to the user:
+
+```php
+$result = MobileWallet::presentPaymentSheet(
+    clientSecret: $clientSecret,
+    merchantDisplayName: 'My Store',
+    publishableKey: config('services.stripe.publishable_key'),
+    merchantId: 'merchant.com.mystore.app',
+    merchantCountryCode: 'US',
+    options: [
+        'allowsDelayedPaymentMethods' => false,
+    ]
+);
+```
+
+### 3. Handle Result
+
+The payment sheet is modal - check the result afterwards:
+
+```php
+if ($result && isset($result->paymentIntent)) {
+    // Payment successful
+    $paymentIntentId = $result->paymentIntent->id;
+} else {
+    // Payment was cancelled or failed
+}
+```
+
+### 4. Confirm Payment (Optional)
+
+For some payment flows, you may need to explicitly confirm:
+
+```php
+$confirmation = MobileWallet::confirmPayment($paymentIntentId);
+
+if ($confirmation && $confirmation->status === 'succeeded') {
+    // Payment confirmed
+}
+```
+
+### 5. Check Payment Status
+
+Verify the final payment status:
+
+```php
+$status = MobileWallet::getPaymentStatus($paymentIntentId);
+
+if ($status && $status->status === 'succeeded') {
+    // Process order
+}
+```
+
+## Methods Reference
+
+### `isAvailable()`
+
+Checks if Apple Pay or Google Pay is available on the device.
+
+**Returns:** `bool`
+
+```php
+$available = MobileWallet::isAvailable();
+```
+
+### `createPaymentIntent(int $amount, string $currency = 'usd', array $metadata = [])`
+
+Creates a Stripe payment intent for the transaction.
+
+**Parameters:**
+- `$amount` (int) - Amount in smallest currency unit (cents for USD)
+- `$currency` (string) - Three-letter ISO currency code (lowercase)
+- `$metadata` (array) - Additional metadata to attach to the payment
+
+**Returns:** `object|null` - Payment intent data including `client_secret`
+
+```php
+$intent = MobileWallet::createPaymentIntent(
+    amount: 2499,
+    currency: 'usd',
+    metadata: [
+        'order_id' => '12345',
+        'customer_id' => 'cust_123',
+    ]
+);
+
+$clientSecret = $intent->client_secret;
+```
+
+### `presentPaymentSheet(string $clientSecret, string $merchantDisplayName, string $publishableKey, string $merchantId, string $merchantCountryCode = 'US', array $options = [])`
+
+Presents the native payment sheet for card/wallet selection.
+
+**Parameters:**
+- `$clientSecret` (string) - The client secret from the payment intent
+- `$merchantDisplayName` (string) - The merchant name to display
+- `$publishableKey` (string) - The Stripe publishable key
+- `$merchantId` (string) - The Apple Pay merchant ID (e.g., "merchant.com.yourapp")
+- `$merchantCountryCode` (string) - ISO country code (default: "US")
+- `$options` (array) - Additional options for the payment sheet
+
+**Returns:** `object|null` - Result of presenting the payment sheet
+
+```php
+$result = MobileWallet::presentPaymentSheet(
+    clientSecret: $intent->client_secret,
+    merchantDisplayName: 'Acme Store',
+    publishableKey: 'pk_live_...',
+    merchantId: 'merchant.com.acmestore',
+    merchantCountryCode: 'US',
+    options: []
+);
+```
+
+### `confirmPayment(string $paymentIntentId)`
+
+Confirms the payment with the selected payment method.
+
+**Parameters:**
+- `$paymentIntentId` (string) - The payment intent ID to confirm
+
+**Returns:** `object|null` - Confirmation result
+
+```php
+$confirmation = MobileWallet::confirmPayment('pi_123456');
+```
+
+### `getPaymentStatus(string $paymentIntentId)`
+
+Retrieves the current payment status.
+
+**Parameters:**
+- `$paymentIntentId` (string) - The payment intent ID to check
+
+**Returns:** `object|null` - Payment status information
+
+```php
+$status = MobileWallet::getPaymentStatus('pi_123456');
+
+if ($status->status === 'succeeded') {
+    // Payment successful
+}
+```
+
+## Complete Example
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\MobileWallet;
+use Native\Mobile\Events\Wallet\PaymentCompleted;
+use Native\Mobile\Events\Wallet\PaymentFailed;
+use Native\Mobile\Events\Wallet\PaymentCancelled;
+
+class Checkout extends Component
+{
+    public $order;
+    public $isProcessing = false;
+    public $walletAvailable = false;
+
+    public function mount($orderId)
+    {
+        $this->order = Order::findOrFail($orderId);
+        $this->walletAvailable = MobileWallet::isAvailable();
+    }
+
+    public function payWithWallet()
+    {
+        if (!$this->walletAvailable) {
+            session()->flash('error', 'Mobile wallet not available');
+            return;
+        }
+
+        $this->isProcessing = true;
+
+        try {
+            // Create payment intent
+            $intent = MobileWallet::createPaymentIntent(
+                amount: (int) ($this->order->total * 100), // Convert to cents
+                currency: 'usd',
+                metadata: [
+                    'order_id' => $this->order->id,
+                    'user_id' => auth()->id(),
+                ]
+            );
+
+            if (!$intent) {
+                throw new \Exception('Failed to create payment intent');
+            }
+
+            // Store payment intent ID for later
+            $this->order->update([
+                'stripe_payment_intent_id' => $intent->id,
+            ]);
+
+            // Present payment sheet
+            $result = MobileWallet::presentPaymentSheet(
+                clientSecret: $intent->client_secret,
+                merchantDisplayName: config('app.name'),
+                publishableKey: config('services.stripe.key'),
+                merchantId: config('services.stripe.merchant_id'),
+                merchantCountryCode: 'US'
+            );
+
+            // Check immediate result
+            if ($result && isset($result->error)) {
+                throw new \Exception($result->error->message ?? 'Payment failed');
+            }
+
+        } catch (\Exception $e) {
+            $this->isProcessing = false;
+            session()->flash('error', 'Payment error: ' . $e->getMessage());
+        }
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCompleted')]
+    public function handlePaymentCompleted($data)
+    {
+        $paymentIntentId = $data['paymentIntentId'] ?? null;
+
+        if ($paymentIntentId === $this->order->stripe_payment_intent_id) {
+            // Verify payment status
+            $status = MobileWallet::getPaymentStatus($paymentIntentId);
+
+            if ($status && $status->status === 'succeeded') {
+                // Update order
+                $this->order->update([
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                ]);
+
+                $this->isProcessing = false;
+
+                // Redirect to success page
+                return redirect()->route('orders.success', $this->order);
+            }
+        }
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentFailed')]
+    public function handlePaymentFailed($data)
+    {
+        $this->isProcessing = false;
+        $error = $data['error'] ?? 'Payment failed';
+        session()->flash('error', $error);
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCancelled')]
+    public function handlePaymentCancelled()
+    {
+        $this->isProcessing = false;
+        session()->flash('message', 'Payment cancelled');
+    }
+
+    public function render()
+    {
+        return view('livewire.checkout');
+    }
+}
+```
+
+## Events
+
+Listen for payment events in your Livewire components:
+
+```php
+use Livewire\Attributes\On;
+
+#[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCompleted')]
+public function handlePaymentCompleted($data)
+{
+    $paymentIntentId = $data['paymentIntentId'];
+    // Handle successful payment
+}
+
+#[On('native:Native\\Mobile\\Events\\Wallet\\PaymentFailed')]
+public function handlePaymentFailed($data)
+{
+    $error = $data['error'];
+    // Handle failed payment
+}
+
+#[On('native:Native\\Mobile\\Events\\Wallet\\PaymentCancelled')]
+public function handlePaymentCancelled()
+{
+    // User cancelled payment
+}
+```
+
+## Platform Configuration
+
+### iOS (Apple Pay)
+
+**Requirements:**
+1. Apple Developer account with Apple Pay enabled
+2. Merchant ID configured in Apple Developer portal
+3. Payment processing certificate
+4. App configured with Apple Pay capability
+
+**Xcode Configuration:**
+1. Enable "Apple Pay" capability
+2. Add merchant ID to entitlements
+3. Configure merchant identifier
+
+**Info.plist:**
+```xml
+<key>com.apple.developer.in-app-payments</key>
+<array>
+    <string>merchant.com.yourapp</string>
+</array>
+```
+
+**Stripe Configuration:**
+1. Register merchant ID with Stripe
+2. Configure Apple Pay in Stripe Dashboard
+3. Verify domain ownership
+
+### Android (Google Pay)
+
+**Requirements:**
+1. Google Play Console account
+2. Production app published on Play Store
+3. Google Pay API enabled
+4. Stripe account configured for Google Pay
+
+**AndroidManifest.xml:**
+```xml
+<meta-data
+    android:name="com.google.android.gms.wallet.api.enabled"
+    android:value="true" />
+```
+
+**Gradle:**
+```gradle
+dependencies {
+    implementation 'com.google.android.gms:play-services-wallet:19.1.0'
+    implementation 'com.stripe:stripe-android:20.x.x'
+}
+```
+
+**Stripe Configuration:**
+1. Enable Google Pay in Stripe Dashboard
+2. Add Google Pay merchant ID
+3. Configure payment methods
+
+## Currency Support
+
+Specify currency using three-letter ISO codes (lowercase):
+
+```php
+// USD (US Dollar)
+MobileWallet::createPaymentIntent(1000, 'usd');
+
+// EUR (Euro)
+MobileWallet::createPaymentIntent(1000, 'eur');
+
+// GBP (British Pound)
+MobileWallet::createPaymentIntent(1000, 'gbp');
+
+// JPY (Japanese Yen - no decimal places)
+MobileWallet::createPaymentIntent(1000, 'jpy'); // ¥1,000
+```
+
+<Note>
+Some currencies (like JPY) don't use decimal places. $10 USD = 1000 cents, but ¥1000 JPY = 1000 (not 100000).
+</Note>
+
+## Best Practices
+
+1. **Always Check Availability**: Don't show wallet buttons if not available
+
+```php
+@if(MobileWallet::isAvailable())
+    <button wire:click="payWithWallet">Pay with Apple/Google Pay</button>
+@endif
+```
+
+2. **Handle All States**: Listen for completed, failed, and cancelled events
+
+3. **Verify on Server**: Always verify payment status on your server before fulfilling orders
+
+4. **Use Metadata**: Store order information in payment intent metadata
+
+5. **Provide Feedback**: Show loading states during payment processing
+
+6. **Handle Errors Gracefully**: Show user-friendly error messages
+
+## Testing
+
+### iOS Simulator
+- Use test cards in Wallet app
+- Stripe provides test card numbers
+- Requires Xcode sandbox environment
+
+### Android Emulator
+- Use test Google accounts
+- Configure test payment methods
+- Requires Google Play Services
+
+### Stripe Test Mode
+- Use test publishable key: `pk_test_...`
+- Use test secret key: `sk_test_...`
+- Test card: `4242 4242 4242 4242`

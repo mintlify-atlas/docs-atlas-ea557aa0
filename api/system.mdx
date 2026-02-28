@@ -1,0 +1,342 @@
+---
+title: System
+description: Platform detection and system-level operations
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\System;
+```
+
+## Methods
+
+### isIos()
+
+Check if the app is running on iOS.
+
+```php
+use Native\Mobile\Facades\System;
+
+$isIOS = System::isIos();
+```
+
+<ResponseField name="return" type="bool">
+  True if running on iOS, false otherwise
+</ResponseField>
+
+### isAndroid()
+
+Check if the app is running on Android.
+
+```php
+use Native\Mobile\Facades\System;
+
+$isAndroid = System::isAndroid();
+```
+
+<ResponseField name="return" type="bool">
+  True if running on Android, false otherwise
+</ResponseField>
+
+### isMobile()
+
+Check if the app is running on a mobile platform (iOS or Android).
+
+```php
+use Native\Mobile\Facades\System;
+
+$isMobile = System::isMobile();
+```
+
+<ResponseField name="return" type="bool">
+  True if running on iOS or Android, false otherwise
+</ResponseField>
+
+### appSettings()
+
+Open the app's settings screen in the device settings.
+
+This allows users to manage permissions (push notifications, camera, location, etc.) that they've granted or denied for the app.
+
+```php
+use Native\Mobile\Facades\System;
+
+System::appSettings();
+```
+
+### flashlight() <Badge type="warn">Deprecated</Badge>
+
+<Warning>
+  This method is deprecated since version 2.0.0. Use `Device::flashlight()` instead.
+</Warning>
+
+## Examples
+
+### Platform-Specific UI
+
+```php
+use Native\Mobile\Facades\System;
+use Livewire\Component;
+
+class PlatformAwareComponent extends Component
+{
+    public function getButtonStyle(): string
+    {
+        if (System::isIos()) {
+            return 'ios-style-button';
+        }
+        
+        if (System::isAndroid()) {
+            return 'material-design-button';
+        }
+        
+        return 'default-button';
+    }
+    
+    public function render()
+    {
+        return view('livewire.platform-aware', [
+            'buttonClass' => $this->getButtonStyle(),
+            'platform' => System::isIos() ? 'iOS' : 'Android',
+        ]);
+    }
+}
+```
+
+### Platform-Specific Features
+
+```php
+use Native\Mobile\Facades\System;
+
+class FeatureDetector
+{
+    public function hasFeature(string $feature): bool
+    {
+        return match($feature) {
+            'face_id' => System::isIos(),
+            'fingerprint' => System::isAndroid() || System::isIos(),
+            'nfc' => System::isAndroid(),
+            default => false,
+        };
+    }
+    
+    public function getPlatformName(): string
+    {
+        return match(true) {
+            System::isIos() => 'iOS',
+            System::isAndroid() => 'Android',
+            default => 'Unknown',
+        };
+    }
+}
+```
+
+### Permission Settings Navigation
+
+```php
+use Native\Mobile\Facades\System;
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Events\Alert\ButtonPressed;
+use Illuminate\Support\Facades\Event;
+
+class PermissionHelper
+{
+    public function requestCameraAccess()
+    {
+        Dialog::alert(
+            'Camera Permission Required',
+            'This app needs camera access. Open Settings to enable it?',
+            ['Open Settings', 'Cancel']
+        )->id('camera-permission');
+        
+        Event::listen(ButtonPressed::class, function ($event) {
+            if ($event->id === 'camera-permission' && $event->index === 0) {
+                System::appSettings();
+            }
+        });
+    }
+    
+    public function requestLocationAccess()
+    {
+        Dialog::alert(
+            'Location Permission Required',
+            'Enable location access in Settings to use this feature.',
+            ['Open Settings', 'Cancel']
+        )->id('location-permission');
+        
+        Event::listen(ButtonPressed::class, function ($event) {
+            if ($event->id === 'location-permission' && $event->index === 0) {
+                System::appSettings();
+            }
+        });
+    }
+}
+```
+
+### Conditional Logic Based on Platform
+
+```php
+use Native\Mobile\Facades\System;
+
+class PlatformBehavior
+{
+    public function getNotificationStrategy(): string
+    {
+        if (System::isIos()) {
+            return 'apns'; // Apple Push Notification Service
+        }
+        
+        if (System::isAndroid()) {
+            return 'fcm'; // Firebase Cloud Messaging
+        }
+        
+        return 'none';
+    }
+    
+    public function getDeepLinkScheme(): string
+    {
+        if (System::isIos()) {
+            return 'myapp://'; // Universal Links
+        }
+        
+        if (System::isAndroid()) {
+            return 'myapp://'; // App Links
+        }
+        
+        return 'https://';
+    }
+}
+```
+
+### Platform-Specific Analytics
+
+```php
+use Native\Mobile\Facades\System;
+
+class AnalyticsTracker
+{
+    public function trackEvent(string $event, array $properties = [])
+    {
+        $properties['platform'] = match(true) {
+            System::isIos() => 'ios',
+            System::isAndroid() => 'android',
+            default => 'unknown',
+        };
+        
+        // Send to analytics service
+        Http::post('https://analytics.example.com/track', [
+            'event' => $event,
+            'properties' => $properties,
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    }
+}
+```
+
+### Settings Page with Deep Link
+
+```php
+use Native\Mobile\Facades\System;
+use Livewire\Component;
+
+class SettingsPage extends Component
+{
+    public $permissions = [];
+    
+    public function mount()
+    {
+        $this->checkPermissions();
+    }
+    
+    public function checkPermissions()
+    {
+        // Check various permissions
+        $this->permissions = [
+            'camera' => $this->hasCameraPermission(),
+            'location' => $this->hasLocationPermission(),
+            'notifications' => $this->hasNotificationPermission(),
+        ];
+    }
+    
+    public function openSystemSettings()
+    {
+        System::appSettings();
+    }
+    
+    public function render()
+    {
+        return view('livewire.settings-page');
+    }
+}
+```
+
+```blade
+<!-- resources/views/livewire/settings-page.blade.php -->
+<div>
+    <h2>Permissions</h2>
+    
+    @foreach($permissions as $name => $granted)
+        <div class="permission-row">
+            <span>{{ ucfirst($name) }}</span>
+            <span>{{ $granted ? 'Granted' : 'Denied' }}</span>
+        </div>
+    @endforeach
+    
+    <button wire:click="openSystemSettings">
+        Open System Settings
+    </button>
+</div>
+```
+
+### Platform-Specific Error Messages
+
+```php
+use Native\Mobile\Facades\System;
+
+class ErrorHandler
+{
+    public function getPermissionInstructions(string $permission): string
+    {
+        $platformName = System::isIos() ? 'iOS Settings' : 'Android Settings';
+        
+        return match($permission) {
+            'camera' => "Enable camera access in {$platformName} > Privacy > Camera.",
+            'location' => "Enable location access in {$platformName} > Privacy > Location Services.",
+            'notifications' => "Enable notifications in {$platformName} > Notifications.",
+            default => "Enable this permission in {$platformName}.",
+        };
+    }
+}
+```
+
+### Mobile-Only Features
+
+```php
+use Native\Mobile\Facades\System;
+
+class MobileFeatureGuard
+{
+    public function requireMobile()
+    {
+        if (!System::isMobile()) {
+            abort(403, 'This feature is only available on mobile devices.');
+        }
+    }
+    
+    public function mobileOnly(callable $callback)
+    {
+        if (System::isMobile()) {
+            return $callback();
+        }
+        
+        return null;
+    }
+}
+
+// Usage in routes
+Route::get('/mobile-feature', function () {
+    app(MobileFeatureGuard::class)->requireMobile();
+    // ... mobile-specific logic
+});
+```

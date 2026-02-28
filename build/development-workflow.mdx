@@ -1,0 +1,298 @@
+---
+title: Development Workflow
+description: Development workflow and best practices for NativePHP Mobile
+---
+
+## Overview
+
+NativePHP Mobile provides a streamlined development workflow that lets you build, test, and iterate on your mobile apps quickly. The development cycle revolves around the `native:run` command, which builds your app and deploys it to emulators or physical devices.
+
+## Development Cycle
+
+The typical development workflow follows this pattern:
+
+<Steps>
+  <Step title="Write Code">
+    Make changes to your Laravel application code, views, or assets.
+  </Step>
+  
+  <Step title="Run the App">
+    Use `php artisan native:run` to build and launch your app on a device or emulator.
+  </Step>
+  
+  <Step title="Test Changes">
+    Interact with your app on the device to verify functionality.
+  </Step>
+  
+  <Step title="Iterate">
+    Return to step 1 and repeat. Use the `--watch` flag for automatic hot reloading.
+  </Step>
+</Steps>
+
+## Running Your App
+
+### Basic Usage
+
+The `native:run` command builds and runs your app on iOS or Android:
+
+```bash
+# Interactive platform selection (macOS only)
+php artisan native:run
+
+# Run on Android
+php artisan native:run android
+php artisan native:run --android
+
+# Run on iOS (macOS only)
+php artisan native:run ios
+php artisan native:run --ios
+```
+
+You can use shorthand notation:
+
+```bash
+# Shorthand for Android
+php artisan native:run a
+
+# Shorthand for iOS
+php artisan native:run i
+```
+
+### Build Types
+
+Choose between debug and release builds:
+
+```bash
+# Debug build (default)
+php artisan native:run android --build=debug
+
+# Release build
+php artisan native:run android --build=release
+
+# Android App Bundle
+php artisan native:run android --build=bundle
+```
+
+**Build Types:**
+- **Debug**: Fast builds with debugging enabled, ideal for development
+- **Release**: Optimized builds for production testing
+- **Bundle**: Android App Bundle format (AAB) for Play Store distribution
+
+### Device Selection
+
+When running in debug mode, you'll be prompted to select a target device:
+
+```bash
+# Let the CLI prompt you
+php artisan native:run android
+
+# Specify a device UDID directly
+php artisan native:run android emulator-5554
+```
+
+The command will automatically:
+- Detect connected physical devices
+- List available emulators
+- Launch an emulator if none are running
+
+### Custom Start URL
+
+Launch your app at a specific route:
+
+```bash
+php artisan native:run android --start-url=/dashboard
+```
+
+This updates `NATIVEPHP_START_URL` in your `.env` file and loads that path when the app starts.
+
+## Hot Reload Development
+
+Enable hot reload to automatically sync changes to your running app:
+
+```bash
+php artisan native:run android --watch
+php artisan native:run android -W
+```
+
+With hot reload enabled:
+- File changes are detected automatically
+- Updates are pushed to the running app via WebSocket
+- No need to rebuild and reinstall
+
+<Note>
+Hot reload requires Watchman to be installed on your system. See the [Hot Reload documentation](/build/hot-reload) for setup instructions.
+</Note>
+
+## Emulator vs Device Testing
+
+### Emulators/Simulators
+
+**Pros:**
+- Fast to launch and test
+- Easy to test multiple device sizes
+- No physical hardware required
+- Debugging tools readily available
+
+**Cons:**
+- May not accurately represent device performance
+- Some hardware features unavailable (camera, GPS, NFC)
+- Graphics performance differs from real devices
+
+**When to use:** Rapid development, UI testing, general functionality testing
+
+### Physical Devices
+
+**Pros:**
+- True performance characteristics
+- Access to all hardware features
+- Real-world network conditions
+- Accurate touch and gesture testing
+
+**Cons:**
+- Requires device setup and connection
+- May be slower for rapid iteration
+- Limited to devices you own
+
+**When to use:** Performance testing, hardware feature testing, final QA
+
+### Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use emulators for rapid development">
+    Emulators are ideal for quick iterations during active development. They launch faster and don't require device connectivity.
+  </Accordion>
+  
+  <Accordion title="Test on real devices regularly">
+    Run your app on physical devices at least once per major feature to catch performance issues and hardware-specific bugs.
+  </Accordion>
+  
+  <Accordion title="Test on multiple device sizes">
+    Use emulators to quickly test different screen sizes and resolutions, especially for responsive layouts.
+  </Accordion>
+  
+  <Accordion title="Test platform-specific features on real hardware">
+    Features like push notifications, NFC, biometrics, and camera work best when tested on physical devices.
+  </Accordion>
+</AccordionGroup>
+
+## Build Logs
+
+Build logs are automatically saved to help diagnose issues:
+
+```bash
+# Android build log
+nativephp/android-build.log
+
+# iOS build log
+nativephp/ios-build.log
+```
+
+Use verbose output for detailed build information:
+
+```bash
+php artisan native:run android -v
+```
+
+## Platform-Specific Requirements
+
+### Android
+
+**Required:**
+- Android SDK installed
+- ADB (Android Debug Bridge) in PATH
+- At least one emulator or connected device
+
+**Environment Variables:**
+```bash
+NATIVEPHP_ANDROID_SDK_LOCATION=/path/to/android/sdk
+```
+
+### iOS (macOS only)
+
+**Required:**
+- Xcode installed
+- iOS Simulator or physical device
+- Development team configured in `nativephp.php`
+
+**Environment Variables:**
+```bash
+NATIVEPHP_DEVELOPMENT_TEAM=TEAM_ID_HERE
+```
+
+## Troubleshooting
+
+### App ID Not Set
+
+```
+NATIVEPHP_APP_ID is not set.
+```
+
+**Solution:** Add `NATIVEPHP_APP_ID` to your `.env` file:
+
+```bash
+NATIVEPHP_APP_ID=com.example.myapp
+```
+
+### No Devices Found
+
+```
+No connected Android devices or emulators found.
+```
+
+**Solution:** 
+- Ensure ADB is running: `adb devices`
+- Launch an emulator from Android Studio
+- Connect a physical device via USB with debugging enabled
+
+### WSL Not Supported (Android)
+
+```
+Android is not supported in WSL (Windows Subsystem for Linux).
+```
+
+**Solution:** Run the command from Windows CMD or PowerShell, not from WSL.
+
+### Build Failed
+
+Check the build log for detailed error information:
+
+```bash
+# Android
+cat nativephp/android-build.log
+
+# iOS
+cat nativephp/ios-build.log
+```
+
+Run with verbose output for more details:
+
+```bash
+php artisan native:run android -v
+```
+
+## Non-Interactive Environments
+
+For CI/CD pipelines, disable TTY mode:
+
+```bash
+php artisan native:run android --no-tty
+```
+
+This prevents interactive prompts and is suitable for automated builds.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hot Reload" icon="fire" href="/build/hot-reload">
+    Set up hot reload for faster development
+  </Card>
+  <Card title="Packaging" icon="box" href="/build/packaging">
+    Package your app for distribution
+  </Card>
+  <Card title="iOS Deployment" icon="apple" href="/build/ios-deployment">
+    Deploy to the App Store
+  </Card>
+  <Card title="Android Deployment" icon="android" href="/build/android-deployment">
+    Deploy to Google Play Store
+  </Card>
+</CardGroup>

@@ -1,0 +1,287 @@
+---
+title: Device
+description: Access device information, battery status, and hardware controls
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Device;
+```
+
+## Methods
+
+### getId()
+
+Get a unique identifier for the device.
+
+```php
+use Native\Mobile\Facades\Device;
+
+$deviceId = Device::getId();
+```
+
+<ResponseField name="return" type="string|null">
+  The device's unique identifier, or null if unavailable
+</ResponseField>
+
+### getInfo()
+
+Get detailed device information including platform, model, OS version, and more.
+
+```php
+use Native\Mobile\Facades\Device;
+
+$info = Device::getInfo();
+$decoded = json_decode($info);
+
+// Access properties
+$platform = $decoded->platform; // 'ios' or 'android'
+$model = $decoded->model; // e.g., 'iPhone 15 Pro'
+$osVersion = $decoded->osVersion; // e.g., '17.2'
+```
+
+<ResponseField name="return" type="string|null">
+  JSON string containing device information, or null if unavailable
+</ResponseField>
+
+**Returned JSON structure:**
+- `platform` (string) - 'ios' or 'android'
+- `model` (string) - Device model name
+- `osVersion` (string) - Operating system version
+- Additional platform-specific fields
+
+### getBatteryInfo()
+
+Get the device's current battery status.
+
+```php
+use Native\Mobile\Facades\Device;
+
+$batteryInfo = Device::getBatteryInfo();
+$decoded = json_decode($batteryInfo);
+
+$level = $decoded->level; // Battery percentage (0-100)
+$isCharging = $decoded->isCharging; // true/false
+```
+
+<ResponseField name="return" type="string|null">
+  JSON string containing battery information, or null if unavailable
+</ResponseField>
+
+**Returned JSON structure:**
+- `level` (int) - Battery percentage (0-100)
+- `isCharging` (bool) - Whether device is charging
+- `state` (string) - Battery state (charging, full, discharging, etc.)
+
+### vibrate()
+
+Trigger a short haptic vibration feedback.
+
+```php
+use Native\Mobile\Facades\Device;
+
+$success = Device::vibrate();
+```
+
+<ResponseField name="return" type="bool">
+  True if vibration was triggered, false otherwise
+</ResponseField>
+
+### flashlight()
+
+Toggle the device flashlight on/off.
+
+```php
+use Native\Mobile\Facades\Device;
+
+$result = Device::flashlight();
+
+// Check the result
+if ($result['success']) {
+    $isOn = $result['state']; // true = on, false = off
+}
+```
+
+<ResponseField name="return" type="array">
+  Array with 'success' (bool) and 'state' (bool) keys
+</ResponseField>
+
+**Returned array:**
+- `success` (bool) - Whether the operation succeeded
+- `state` (bool) - Current flashlight state (true = on, false = off)
+
+## Examples
+
+### Display Device Information
+
+```php
+use Native\Mobile\Facades\Device;
+use Livewire\Component;
+
+class DeviceInfo extends Component
+{
+    public $deviceInfo;
+    public $batteryInfo;
+    
+    public function mount()
+    {
+        $this->loadDeviceInfo();
+    }
+    
+    public function loadDeviceInfo()
+    {
+        $info = Device::getInfo();
+        $battery = Device::getBatteryInfo();
+        
+        $this->deviceInfo = json_decode($info);
+        $this->batteryInfo = json_decode($battery);
+    }
+    
+    public function render()
+    {
+        return view('livewire.device-info');
+    }
+}
+```
+
+```blade
+<div>
+    <h3>Device Information</h3>
+    <p>Platform: {{ $deviceInfo->platform }}</p>
+    <p>Model: {{ $deviceInfo->model }}</p>
+    <p>OS Version: {{ $deviceInfo->osVersion }}</p>
+    
+    <h3>Battery Status</h3>
+    <p>Level: {{ $batteryInfo->level }}%</p>
+    <p>Status: {{ $batteryInfo->isCharging ? 'Charging' : 'On Battery' }}</p>
+</div>
+```
+
+### Flashlight Toggle Button
+
+```php
+use Native\Mobile\Facades\Device;
+use Livewire\Component;
+
+class FlashlightToggle extends Component
+{
+    public bool $isOn = false;
+    
+    public function toggle()
+    {
+        $result = Device::flashlight();
+        
+        if ($result['success']) {
+            $this->isOn = $result['state'];
+        }
+    }
+}
+```
+
+### Haptic Feedback for User Actions
+
+```php
+use Native\Mobile\Facades\Device;
+
+class ActionButton extends Component
+{
+    public function performAction()
+    {
+        // Provide haptic feedback
+        Device::vibrate();
+        
+        // Perform the action
+        $this->processAction();
+    }
+}
+```
+
+### Battery Level Warning
+
+```php
+use Native\Mobile\Facades\Device;
+
+class BatteryMonitor
+{
+    public function checkBatteryLevel(): void
+    {
+        $batteryInfo = Device::getBatteryInfo();
+        $battery = json_decode($batteryInfo);
+        
+        if ($battery->level < 20 && !$battery->isCharging) {
+            // Show low battery warning
+            Dialog::alert(
+                'Low Battery',
+                'Your battery is below 20%. Consider charging your device.',
+                ['OK']
+            );
+        }
+    }
+}
+```
+
+### Device-Specific Feature Detection
+
+```php
+use Native\Mobile\Facades\Device;
+
+class FeatureDetector
+{
+    public function isIOS(): bool
+    {
+        $info = Device::getInfo();
+        if (!$info) return false;
+        
+        $decoded = json_decode($info);
+        return $decoded->platform === 'ios';
+    }
+    
+    public function isAndroid(): bool
+    {
+        $info = Device::getInfo();
+        if (!$info) return false;
+        
+        $decoded = json_decode($info);
+        return $decoded->platform === 'android';
+    }
+    
+    public function getOSVersion(): ?string
+    {
+        $info = Device::getInfo();
+        if (!$info) return null;
+        
+        $decoded = json_decode($info);
+        return $decoded->osVersion ?? null;
+    }
+}
+```
+
+### Track Device for Analytics
+
+```php
+use Native\Mobile\Facades\Device;
+
+class Analytics
+{
+    public function recordSession(): void
+    {
+        $deviceId = Device::getId();
+        $info = Device::getInfo();
+        $battery = Device::getBatteryInfo();
+        
+        $decoded = json_decode($info);
+        $batteryData = json_decode($battery);
+        
+        // Log session data
+        SessionLog::create([
+            'device_id' => $deviceId,
+            'platform' => $decoded->platform,
+            'model' => $decoded->model,
+            'os_version' => $decoded->osVersion,
+            'battery_level' => $batteryData->level,
+            'timestamp' => now(),
+        ]);
+    }
+}
+```

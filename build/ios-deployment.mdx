@@ -1,0 +1,505 @@
+---
+title: iOS Deployment
+description: Deploy your NativePHP app to the App Store
+---
+
+## Overview
+
+Deploying an iOS app to the App Store involves code signing, archiving, and uploading your app to App Store Connect. NativePHP automates much of this process through the packaging and release commands.
+
+## Prerequisites
+
+<AccordionGroup>
+  <Accordion title="Apple Developer Account">
+    An active Apple Developer Program membership ($99/year) is required to distribute apps on the App Store.
+  </Accordion>
+  
+  <Accordion title="App Store Connect App">
+    Create your app in App Store Connect with the same bundle identifier as your `NATIVEPHP_APP_ID`.
+  </Accordion>
+  
+  <Accordion title="Code Signing Certificates">
+    You need an iOS Distribution certificate from the Apple Developer Portal.
+  </Accordion>
+  
+  <Accordion title="Provisioning Profile">
+    Create an App Store provisioning profile that includes your distribution certificate.
+  </Accordion>
+  
+  <Accordion title="App Store Connect API Key">
+    Generate an API key in App Store Connect for automated uploads.
+  </Accordion>
+</AccordionGroup>
+
+## Code Signing Setup
+
+### Development Team Configuration
+
+Set your Apple Developer Team ID in `config/nativephp.php`:
+
+```php
+'development_team' => env('NATIVEPHP_DEVELOPMENT_TEAM'),
+```
+
+Or in your `.env` file:
+
+```bash
+NATIVEPHP_DEVELOPMENT_TEAM=XXXXXXXXXX
+```
+
+<Note>
+Find your Team ID in your Apple Developer account under **Membership** > **Team ID**.
+</Note>
+
+### App Store Connect API Key
+
+Generate an API key for automated uploads:
+
+<Steps>
+  <Step title="Create API Key">
+    In App Store Connect, go to **Users and Access** > **Keys** > **App Store Connect API**.
+  </Step>
+  
+  <Step title="Generate Key">
+    Click the **+** button and select **Admin** or **Developer** role.
+  </Step>
+  
+  <Step title="Download Key">
+    Download the `.p8` file - **you can only download it once**.
+  </Step>
+  
+  <Step title="Note Credentials">
+    Save the **Key ID** and **Issuer ID** shown on the page.
+  </Step>
+</Steps>
+
+**Configuration:**
+
+Add to your `.env` file:
+
+```bash
+APP_STORE_API_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8
+APP_STORE_API_KEY_ID=XXXXXXXXXX
+APP_STORE_API_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+Or configure in `config/nativephp.php`:
+
+```php
+'app_store_connect' => [
+    'api_key' => env('APP_STORE_API_KEY'),
+    'api_key_id' => env('APP_STORE_API_KEY_ID'),
+    'api_issuer_id' => env('APP_STORE_API_ISSUER_ID'),
+    'app_name' => env('APP_STORE_APP_NAME'),
+],
+```
+
+### Distribution Certificate
+
+For manual signing or CI/CD:
+
+```bash
+IOS_DISTRIBUTION_CERTIFICATE_PATH=/path/to/distribution.p12
+IOS_DISTRIBUTION_CERTIFICATE_PASSWORD=certificate_password
+```
+
+### Provisioning Profile
+
+For manual signing:
+
+```bash
+IOS_DISTRIBUTION_PROVISIONING_PROFILE_PATH=/path/to/profile.mobileprovision
+```
+
+## Building for App Store
+
+### Package Command
+
+Build a signed archive ready for App Store submission:
+
+```bash
+php artisan native:package ios \
+  --export-method=app-store
+```
+
+With all credentials:
+
+```bash
+php artisan native:package ios \
+  --api-key-path=/path/to/AuthKey.p8 \
+  --api-key-id=YOUR_KEY_ID \
+  --api-issuer-id=YOUR_ISSUER_ID \
+  --team-id=YOUR_TEAM_ID \
+  --export-method=app-store
+```
+
+### Direct Upload to App Store Connect
+
+Package and upload in one command:
+
+```bash
+php artisan native:package ios \
+  --export-method=app-store \
+  --upload-to-app-store
+```
+
+This will:
+1. Build and sign your app
+2. Create an IPA file
+3. Validate the archive
+4. Upload to App Store Connect
+
+### Build Number Management
+
+Build numbers are automatically incremented when uploading:
+
+```bash
+# Auto-increment and upload
+php artisan native:package ios \
+  --upload-to-app-store
+```
+
+Skip ahead by a specific number:
+
+```bash
+# Jump build number by 10
+php artisan native:package ios \
+  --upload-to-app-store \
+  --jump-by=10
+```
+
+This is useful when you need to match build numbers across platforms or skip reserved numbers.
+
+## Export Methods
+
+iOS apps can be exported for different distribution channels:
+
+### App Store Distribution
+
+```bash
+php artisan native:package ios --export-method=app-store
+```
+
+- For submission to the App Store
+- Requires App Store provisioning profile
+- Uses production APS environment for push notifications
+
+### Ad-Hoc Distribution
+
+```bash
+php artisan native:package ios --export-method=ad-hoc
+```
+
+- For distributing to registered devices outside the App Store
+- Limited to 100 devices per year
+- Uses production APS environment
+
+### Enterprise Distribution
+
+```bash
+php artisan native:package ios --export-method=enterprise
+```
+
+- For internal company distribution
+- Requires Apple Developer Enterprise Program
+- Uses production APS environment
+
+### Development Distribution
+
+```bash
+php artisan native:package ios --export-method=development
+```
+
+- For testing on developer devices
+- Uses development APS environment
+- Not for distribution
+
+## Push Notifications Configuration
+
+Push notifications require specific entitlements and APS environment configuration.
+
+### APS Environment
+
+The APS environment is automatically configured based on export method:
+
+| Export Method | APS Environment |
+|--------------|----------------|
+| `app-store` | `production` |
+| `ad-hoc` | `production` |
+| `enterprise` | `production` |
+| `development` | `development` |
+
+### Entitlements File
+
+NativePHP automatically generates the entitlements file at `nativephp/ios/NativePHP/NativePHP.entitlements`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>aps-environment</key>
+  <string>production</string>
+  <key>com.apple.developer.associated-domains</key>
+  <array>
+    <string>applinks:yourdomain.com</string>
+  </array>
+</dict>
+</plist>
+```
+
+### Provisioning Profile Validation
+
+Validate your provisioning profile includes required entitlements:
+
+```bash
+php artisan native:package ios \
+  --validate-profile \
+  --export-method=app-store
+```
+
+Output:
+
+```
+Profile Name: My App Store Profile
+
+Entitlements:
+  aps-environment                          production
+  com.apple.developer.associated-domains   [applinks:example.com]
+
+Push notifications: supported (production)
+App Bundle ID: com.example.myapp
+Push Notifications Enabled: Yes
+```
+
+## TestFlight Distribution
+
+After uploading to App Store Connect, your app is automatically available for TestFlight:
+
+<Steps>
+  <Step title="Upload Build">
+    Use `--upload-to-app-store` to upload your build:
+    
+    ```bash
+    php artisan native:package ios --upload-to-app-store
+    ```
+  </Step>
+  
+  <Step title="Wait for Processing">
+    App Store Connect processes your build (usually 5-15 minutes).
+  </Step>
+  
+  <Step title="Add to TestFlight">
+    In App Store Connect, go to **TestFlight** > **iOS** and select your build.
+  </Step>
+  
+  <Step title="Invite Testers">
+    Add internal or external testers to begin testing.
+  </Step>
+</Steps>
+
+**Internal Testing:**
+- Up to 100 internal testers
+- No review required
+- Immediate access
+
+**External Testing:**
+- Up to 10,000 external testers
+- Requires App Store review
+- Can take 24-48 hours
+
+## App Store Submission
+
+After TestFlight testing is complete:
+
+<Steps>
+  <Step title="Create App Store Version">
+    In App Store Connect, create a new version under **App Store** > **iOS App**.
+  </Step>
+  
+  <Step title="Select Build">
+    Choose the build you uploaded from the **Build** dropdown.
+  </Step>
+  
+  <Step title="Complete Metadata">
+    Fill in:
+    - Description
+    - Keywords
+    - Screenshots
+    - Privacy policy URL
+    - App category
+  </Step>
+  
+  <Step title="Submit for Review">
+    Click **Submit for Review** and answer review questions.
+  </Step>
+  
+  <Step title="Wait for Approval">
+    Apple typically reviews apps within 24-48 hours.
+  </Step>
+</Steps>
+
+## Build Configuration
+
+### Version and Build Number
+
+Configured in `config/nativephp.php`:
+
+```php
+// Marketing version (displayed to users)
+'version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+
+// Build number (must increase with each upload)
+'version_code' => env('NATIVEPHP_APP_VERSION_CODE', 1),
+```
+
+### App ID (Bundle Identifier)
+
+```bash
+NATIVEPHP_APP_ID=com.example.myapp
+```
+
+This must match your App Store Connect app's bundle identifier.
+
+### Clean Builds
+
+Clear caches for a completely clean build:
+
+```bash
+php artisan native:package ios --clean-caches
+```
+
+This removes:
+- Xcode derived data
+- Swift Package Manager caches
+- Previous build artifacts
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml
+name: iOS Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+      
+      - name: Install Dependencies
+        run: composer install
+      
+      - name: Build and Upload to App Store
+        env:
+          APP_STORE_API_KEY_PATH: ${{ secrets.APP_STORE_API_KEY_PATH }}
+          APP_STORE_API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
+          APP_STORE_API_ISSUER_ID: ${{ secrets.APP_STORE_API_ISSUER_ID }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          php artisan native:package ios \
+            --upload-to-app-store \
+            --no-tty
+```
+
+### Environment Variables for CI
+
+Store these as secrets in your CI system:
+
+```bash
+APP_STORE_API_KEY_PATH=/path/to/key.p8
+APP_STORE_API_KEY_ID=KEY_ID
+APP_STORE_API_ISSUER_ID=ISSUER_ID
+IOS_TEAM_ID=TEAM_ID
+IOS_DISTRIBUTION_CERTIFICATE_PATH=/path/to/cert.p12
+IOS_DISTRIBUTION_CERTIFICATE_PASSWORD=cert_password
+IOS_DISTRIBUTION_PROVISIONING_PROFILE_PATH=/path/to/profile.mobileprovision
+```
+
+## Troubleshooting
+
+### Code Signing Error
+
+```
+Provisioning profile "Profile Name" doesn't include signing certificate
+```
+
+**Solution:**
+1. Regenerate your provisioning profile in Apple Developer Portal
+2. Ensure it includes your distribution certificate
+3. Download and use the new profile
+
+### Expired Certificate
+
+```
+No signing certificate "Apple Distribution" found
+```
+
+**Solution:**
+1. Check certificate expiration in Keychain Access
+2. Download a new certificate from Apple Developer Portal
+3. Install it in your keychain
+
+### Build Number Already Used
+
+```
+This build number has already been used
+```
+
+**Solution:** The build number must be unique. Use `--jump-by` to skip ahead:
+
+```bash
+php artisan native:package ios --upload-to-app-store --jump-by=1
+```
+
+### Missing API Credentials
+
+```
+Missing required App Store Connect API configuration
+  - --api-key-path
+  - --api-key-id
+  - --api-issuer-id
+```
+
+**Solution:** Provide all three API credentials via flags or environment variables.
+
+### Upload Failed
+
+**Solutions:**
+- Verify API key has not expired
+- Check API key has Admin or Developer role
+- Ensure bundle ID matches App Store Connect
+- Verify version number is valid (semantic versioning)
+
+## App Review Guidelines
+
+Ensure your app complies with Apple's guidelines:
+
+- **Functionality**: App must be fully functional and crash-free
+- **Metadata**: Accurate descriptions and screenshots
+- **Privacy**: Include privacy policy if collecting data
+- **Design**: Follow Human Interface Guidelines
+- **Content**: No prohibited or offensive content
+
+Review the [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) before submission.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Android Deployment" icon="android" href="/build/android-deployment">
+    Deploy your app to Google Play Store
+  </Card>
+  <Card title="Hot Reload" icon="fire" href="/build/hot-reload">
+    Speed up development with hot reload
+  </Card>
+</CardGroup>

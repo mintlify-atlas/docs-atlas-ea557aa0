@@ -1,0 +1,475 @@
+---
+title: Share
+description: Share URLs and files using the native system share sheet
+---
+
+The Share API provides access to the native system share sheet on iOS and Android, allowing users to share content through installed apps and services.
+
+## Usage
+
+Share URLs and files using the native share dialog:
+
+```php
+use Native\Mobile\Facades\Share;
+
+// Share a URL
+Share::url('Check this out', 'Amazing article', 'https://example.com');
+
+// Share a file
+Share::file('Document', 'Here is the document', '/path/to/file.pdf');
+```
+
+## Sharing URLs
+
+Share web links with a title and description:
+
+```php
+use Native\Mobile\Facades\Share;
+
+Share::url(
+    'Article Title',
+    'Check out this interesting article!',
+    'https://example.com/article'
+);
+```
+
+This opens the native share sheet with sharing options like:
+- Messages
+- Email
+- Social media apps
+- Copy link
+- Save to Notes
+- And more (depending on installed apps)
+
+## Sharing Files
+
+Share files from the device's file system:
+
+```php
+use Native\Mobile\Facades\Share;
+
+$filePath = storage_path('app/documents/report.pdf');
+
+Share::file(
+    'Monthly Report',
+    'Please review this month\'s report',
+    $filePath
+);
+```
+
+## Methods Reference
+
+### `url(string $title, string $text, string $url)`
+
+Opens the native share sheet to share a URL.
+
+**Parameters:**
+- `$title` (string) - The title of the shared content
+- `$text` (string) - Descriptive text about the content
+- `$url` (string) - The URL to share
+
+**Returns:** `void`
+
+```php
+Share::url(
+    'Product Page',
+    'Check out this product',
+    'https://store.example.com/products/123'
+);
+```
+
+### `file(string $title, string $text, string $filePath)`
+
+Opens the native share sheet to share a file.
+
+**Parameters:**
+- `$title` (string) - The title of the shared content
+- `$text` (string) - Descriptive text about the file
+- `$filePath` (string) - Absolute path to the file to share
+
+**Returns:** `void`
+
+```php
+Share::file(
+    'Invoice',
+    'Your invoice is attached',
+    '/var/www/storage/invoices/invoice-123.pdf'
+);
+```
+
+<Warning>
+The file path must be an absolute path to a file that exists on the device. Ensure the file is accessible before attempting to share it.
+</Warning>
+
+## Examples
+
+### Share Blog Post
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Share;
+
+class BlogPost extends Component
+{
+    public $post;
+
+    public function mount($postId)
+    {
+        $this->post = Post::findOrFail($postId);
+    }
+
+    public function sharePost()
+    {
+        Share::url(
+            $this->post->title,
+            $this->post->excerpt,
+            route('posts.show', $this->post->slug)
+        );
+    }
+
+    public function render()
+    {
+        return view('livewire.blog-post');
+    }
+}
+```
+
+### Share Generated Report
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Share;
+use Illuminate\Support\Facades\Storage;
+
+class ReportGenerator extends Component
+{
+    public function generateAndShare()
+    {
+        // Generate PDF report
+        $pdf = PDF::loadView('reports.monthly', [
+            'data' => $this->getReportData(),
+        ]);
+
+        // Save to temporary location
+        $filename = 'monthly-report-' . now()->format('Y-m-d') . '.pdf';
+        $path = storage_path('app/temp/' . $filename);
+
+        $pdf->save($path);
+
+        // Share the file
+        Share::file(
+            'Monthly Report',
+            'Report generated on ' . now()->format('F j, Y'),
+            $path
+        );
+    }
+
+    private function getReportData(): array
+    {
+        // Fetch report data
+        return [];
+    }
+
+    public function render()
+    {
+        return view('livewire.report-generator');
+    }
+}
+```
+
+### Share Product with Deep Link
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Share;
+
+class ProductDetails extends Component
+{
+    public $product;
+
+    public function shareProduct()
+    {
+        // Create deep link URL that opens in the app
+        $deepLink = 'myapp://products/' . $this->product->id;
+
+        // Fallback to web URL
+        $webUrl = route('products.show', $this->product->slug);
+
+        Share::url(
+            $this->product->name,
+            $this->product->description,
+            $webUrl // Use web URL for compatibility
+        );
+    }
+
+    public function render()
+    {
+        return view('livewire.product-details');
+    }
+}
+```
+
+### Share User Profile
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Share;
+
+class UserProfile extends Component
+{
+    public $user;
+
+    public function shareProfile()
+    {
+        Share::url(
+            $this->user->name,
+            'Check out ' . $this->user->name . '\'s profile',
+            route('profile', $this->user->username)
+        );
+    }
+
+    public function render()
+    {
+        return view('livewire.user-profile');
+    }
+}
+```
+
+### Share Downloaded File
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Share;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+
+class DocumentViewer extends Component
+{
+    public $document;
+
+    public function downloadAndShare()
+    {
+        // Download file from remote server
+        $response = Http::get($this->document->download_url);
+
+        if ($response->successful()) {
+            // Save temporarily
+            $filename = $this->document->filename;
+            $path = storage_path('app/temp/' . $filename);
+
+            file_put_contents($path, $response->body());
+
+            // Share the downloaded file
+            Share::file(
+                $this->document->title,
+                'Document: ' . $this->document->title,
+                $path
+            );
+
+            // Clean up after a delay (optional)
+            dispatch(function () use ($path) {
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            })->afterResponse();
+        } else {
+            session()->flash('error', 'Failed to download document');
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.document-viewer');
+    }
+}
+```
+
+### Share Image from Camera
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\Share;
+use Native\Mobile\Facades\Camera;
+
+class PhotoShare extends Component
+{
+    public $photoPath;
+
+    public function takePhoto()
+    {
+        Camera::takePhoto();
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+    public function handlePhotoTaken($data)
+    {
+        $this->photoPath = $data['path'];
+    }
+
+    public function sharePhoto()
+    {
+        if ($this->photoPath) {
+            Share::file(
+                'Photo',
+                'Check out this photo!',
+                $this->photoPath
+            );
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.photo-share');
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+On iOS, the Share API uses `UIActivityViewController`:
+
+- Presents the native iOS share sheet
+- Shows all sharing options available to the user
+- Includes AirDrop, Messages, Mail, social media apps, etc.
+- Respects user's installed apps and sharing extensions
+- Supports sharing text, URLs, and files
+- Files must be accessible to the app sandbox
+
+**Share Sheet Appearance:**
+- Modern iOS design with app icons
+- Actions and suggestions based on content type
+- Recent contacts for quick sharing
+
+### Android
+
+On Android, the Share API uses `Intent.ACTION_SEND` and `Intent.ACTION_SEND_MULTIPLE`:
+
+- Presents the Android Share Sheet
+- Shows all apps that can handle the shared content
+- Includes sharing to social media, messaging apps, email, etc.
+- Supports sharing text, URLs, and files
+- Files must be accessible via content URI (handled automatically)
+
+**Share Sheet Appearance:**
+- Material Design share sheet
+- Direct share targets (recent contacts)
+- App targets based on content type
+
+## Best Practices
+
+### 1. Use Descriptive Titles and Text
+
+Provide clear, meaningful titles and descriptions:
+
+```php
+// Good
+Share::url(
+    'How to Build Mobile Apps with Laravel',
+    'Learn how to create native mobile apps using Laravel and NativePHP',
+    'https://blog.example.com/laravel-mobile-apps'
+);
+
+// Less helpful
+Share::url('Article', 'Read this', 'https://example.com');
+```
+
+### 2. Verify File Existence
+
+Always ensure files exist before attempting to share them:
+
+```php
+public function shareReport()
+{
+    $path = storage_path('app/reports/monthly.pdf');
+
+    if (!file_exists($path)) {
+        session()->flash('error', 'Report file not found');
+        return;
+    }
+
+    Share::file('Monthly Report', 'Report for ' . now()->format('F Y'), $path);
+}
+```
+
+### 3. Use Absolute Paths
+
+Always use absolute file paths:
+
+```php
+// Good
+$path = storage_path('app/documents/file.pdf');
+Share::file('Document', 'File', $path);
+
+// Bad - relative paths may not work
+// Share::file('Document', 'File', 'documents/file.pdf');
+```
+
+### 4. Clean Up Temporary Files
+
+If you create temporary files for sharing, clean them up afterwards:
+
+```php
+public function shareGeneratedContent()
+{
+    $tempPath = storage_path('app/temp/' . Str::uuid() . '.pdf');
+
+    // Generate and save content
+    $pdf->save($tempPath);
+
+    // Share
+    Share::file('Report', 'Generated report', $tempPath);
+
+    // Clean up after sharing
+    dispatch(function () use ($tempPath) {
+        if (file_exists($tempPath)) {
+            unlink($tempPath);
+        }
+    })->afterResponse();
+}
+```
+
+### 5. Provide User Feedback
+
+Let users know when sharing is triggered:
+
+```php
+public function shareContent()
+{
+    Share::url('Title', 'Text', 'https://example.com');
+
+    session()->flash('message', 'Share dialog opened');
+}
+```
+
+### 6. Handle Long URLs
+
+For long URLs, consider using a URL shortener:
+
+```php
+public function shareWithShortUrl()
+{
+    $longUrl = route('products.show', ['product' => $this->product->id, 'utm_source' => 'share']);
+
+    // Use a URL shortener service
+    $shortUrl = $this->shortenUrl($longUrl);
+
+    Share::url(
+        $this->product->name,
+        $this->product->description,
+        $shortUrl
+    );
+}
+```
+
+## Limitations
+
+1. **No Callback**: The Share API doesn't provide a callback to know if the user completed the share or cancelled.
+
+2. **No Share Target Selection**: You cannot programmatically select which app the user shares to - they must choose.
+
+3. **File Access**: Files must be accessible to the app. You cannot share files outside the app's sandbox without proper permissions.
+
+4. **Synchronous Operation**: The share sheet is presented immediately. Ensure files are ready before calling `Share::file()`.

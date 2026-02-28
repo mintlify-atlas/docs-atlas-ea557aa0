@@ -1,0 +1,193 @@
+---
+title: Introduction to NativePHP Mobile
+description: Build native iOS and Android apps using PHP and Laravel
+---
+
+<Note>
+  NativePHP Mobile is in active development. Some features may change as the project evolves.
+</Note>
+
+## Welcome to NativePHP Mobile
+
+NativePHP Mobile enables you to build native iOS and Android applications using PHP and Laravel. Write your mobile apps with the same tools and framework you already know, without needing to learn Swift, Kotlin, or React Native.
+
+## How it works
+
+NativePHP Mobile embeds a PHP runtime directly inside your mobile app. Your Laravel application runs natively on the device, rendering views through a WebView while accessing native device features through a simple PHP API.
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Facades\Geolocation;
+use Native\Mobile\Facades\Haptics;
+
+// Take a photo
+$photo = Camera::getPhoto();
+
+// Get current location
+$location = Geolocation::getCurrentPosition(fineAccuracy: true);
+
+// Provide haptic feedback
+Haptics::vibrate();
+```
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Native device access" icon="mobile">
+    Access camera, geolocation, haptics, device info, secure storage, and more through simple PHP facades.
+  </Card>
+  
+  <Card title="Hot reload development" icon="bolt">
+    Develop with live reload on physical devices and emulators using `php artisan native:run --watch`.
+  </Card>
+  
+  <Card title="Cross-platform support" icon="layer-group">
+    Build for both iOS and Android from a single PHP codebase. Platform-specific code when needed.
+  </Card>
+  
+  <Card title="Laravel integration" icon="laravel">
+    Use Blade templates, Eloquent, routing, validation, and all your favorite Laravel features.
+  </Card>
+  
+  <Card title="Plugin system" icon="puzzle-piece">
+    Extend functionality with plugins that add native iOS and Android capabilities to your PHP app.
+  </Card>
+  
+  <Card title="Production ready" icon="rocket">
+    Build release packages for the App Store and Google Play with code signing and optimization.
+  </Card>
+</CardGroup>
+
+## What you can build
+
+NativePHP Mobile is perfect for:
+
+- **Business applications** - Internal tools, dashboards, and admin panels
+- **E-commerce apps** - Shopping experiences with native features
+- **Content apps** - News, blogs, and media consumption
+- **Productivity tools** - Task managers, note-taking, and utilities
+- **Location-based apps** - Services that leverage GPS and maps
+- **Camera-enabled apps** - Photo capture, QR scanning, and image processing
+
+## Platform detection with Blade directives
+
+NativePHP provides convenient Blade directives to conditionally render content:
+
+```blade
+@mobile
+    <p>This content only appears in the mobile app</p>
+@endmobile
+
+@web
+    <p>This content only appears in the web browser</p>
+@endweb
+
+@ios
+    <p>iOS-specific content</p>
+@endios
+
+@android
+    <p>Android-specific content</p>
+@endangroid
+```
+
+## Requirements
+
+<AccordionGroup>
+  <Accordion title="General requirements">
+    - PHP 8.3 or higher
+    - Laravel 10.x, 11.x, or 12.x
+    - Composer
+  </Accordion>
+  
+  <Accordion title="iOS development (macOS only)">
+    - macOS (iOS development requires Apple hardware)
+    - Xcode 14 or later
+    - iOS Simulator or a physical iOS device
+    - Apple Developer account (for physical devices and App Store)
+  </Accordion>
+  
+  <Accordion title="Android development">
+    - Windows, macOS, or Linux
+    - Android SDK (installed via Android Studio)
+    - Java Development Kit (JDK) 17 or later
+    - Android Emulator or a physical Android device
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install NativePHP Mobile and set up your development environment
+  </Card>
+  
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first mobile app in under 5 minutes
+  </Card>
+  
+  <Card title="Native features" icon="sparkles" href="/features/camera">
+    Explore device features like camera, geolocation, and haptics
+  </Card>
+  
+  <Card title="CLI reference" icon="terminal" href="/cli/install">
+    Learn about available commands and development tools
+  </Card>
+</CardGroup>
+
+## Example: Simple mobile app
+
+Here's a taste of what building with NativePHP Mobile looks like:
+
+```php
+// routes/web.php
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Route::post('/capture', function () {
+    $photo = Camera::getPhoto();
+    
+    // Save the photo
+    Storage::put('photos/' . $photo['name'], base64_decode($photo['base64']));
+    
+    Haptics::vibrate();
+    
+    return back()->with('success', 'Photo captured!');
+});
+```
+
+```blade
+{{-- resources/views/welcome.blade.php --}}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My NativePHP App</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body>
+    <h1>Welcome to NativePHP Mobile</h1>
+    
+    @mobile
+        <form action="/capture" method="POST">
+            @csrf
+            <button type="submit">Take Photo</button>
+        </form>
+    @endmobile
+    
+    @web
+        <p>Please open this app on a mobile device</p>
+    @endweb
+</body>
+</html>
+```
+
+## Community and support
+
+- **Documentation** - You're reading it! Explore the sidebar for detailed guides
+- **GitHub** - [nativephp/mobile](https://github.com/nativephp/mobile) for issues and contributions
+- **Discord** - Join the NativePHP community for discussions and help
+
+<Note>
+  Ready to build your first mobile app? Continue to the [installation guide](/installation).
+</Note>

@@ -1,0 +1,596 @@
+---
+title: Creating Custom Plugins
+description: Build your own NativePHP Mobile plugins with native functionality
+---
+
+Create custom plugins to add reusable native functionality to NativePHP Mobile apps. Plugins can include Kotlin (Android) and Swift (iOS) code, bridge functions, permissions, and more.
+
+## Creating a Plugin
+
+<Steps>
+  <Step title="Generate the plugin structure">
+    Use the plugin creation command:
+    
+    ```bash
+    php artisan native:plugin:create
+    ```
+    
+    Or provide the name directly:
+    
+    ```bash
+    php artisan native:plugin:create my-company/plugin-example
+    ```
+    
+    This creates:
+    - Complete plugin directory structure
+    - PHP service provider and facade
+    - Android Kotlin and iOS Swift boilerplate
+    - JavaScript module
+    - Plugin manifest (`nativephp.json`)
+    - Tests and documentation
+  </Step>
+  
+  <Step title="Configure the manifest">
+    Edit `nativephp.json` to define bridge functions, permissions, and dependencies.
+    
+    See [Manifest Format](#manifest-format) below for details.
+  </Step>
+  
+  <Step title="Implement native code">
+    Add your native functionality in:
+    - `resources/android/YourPluginFunctions.kt` (Android)
+    - `resources/ios/YourPluginFunctions.swift` (iOS)
+    
+    See [Native Implementation](#native-implementation) for examples.
+  </Step>
+  
+  <Step title="Add PHP implementation">
+    Implement the PHP facade methods in `src/YourPlugin.php` to call native code via `nativephp_call()`.
+  </Step>
+  
+  <Step title="Install in your app">
+    Add to your app's `composer.json` repositories:
+    
+    ```json
+    {
+      "repositories": [
+        {
+          "type": "path",
+          "url": "./packages/my-company/plugin-example"
+        }
+      ]
+    }
+    ```
+    
+    Then install:
+    
+    ```bash
+    composer require my-company/plugin-example
+    php artisan native:plugin:register my-company/plugin-example
+    php artisan native:install --force
+    ```
+  </Step>
+</Steps>
+
+## Manifest Format
+
+The `nativephp.json` manifest defines your plugin's structure and requirements.
+
+### Basic Structure
+
+```json
+{
+  "name": "my-company/plugin-example",
+  "version": "1.0.0",
+  "description": "A NativePHP Mobile plugin",
+  "namespace": "Example",
+  
+  "keywords": ["nativephp", "mobile", "example"],
+  "category": "utilities",
+  "license": "MIT",
+  
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com",
+    "url": "https://example.com"
+  },
+  
+  "platforms": ["android", "ios"],
+  
+  "bridge_functions": [],
+  "android": {},
+  "ios": {},
+  "assets": {},
+  "events": [],
+  "hooks": {},
+  "secrets": {}
+}
+```
+
+### Bridge Functions
+
+Define native functions callable from PHP:
+
+```json
+{
+  "bridge_functions": [
+    {
+      "name": "Example.Execute",
+      "android": "com.example.plugins.example.ExampleFunctions.Execute",
+      "ios": "ExampleFunctions.Execute",
+      "description": "Execute the plugin functionality"
+    },
+    {
+      "name": "Example.GetStatus",
+      "android": "com.example.plugins.example.ExampleFunctions.GetStatus",
+      "ios": "ExampleFunctions.GetStatus",
+      "description": "Get the current status"
+    }
+  ]
+}
+```
+
+### Platform-Specific Configuration
+
+#### Android
+
+```json
+{
+  "android": {
+    "permissions": [
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO"
+    ],
+    "repositories": [
+      "mavenCentral()",
+      "google()"
+    ],
+    "dependencies": {
+      "implementation": [
+        "androidx.camera:camera-core:1.2.0",
+        "androidx.camera:camera-camera2:1.2.0"
+      ]
+    },
+    "features": [
+      "<uses-feature android:name=\"android.hardware.camera\" android:required=\"true\" />"
+    ],
+    "activities": [
+      "<activity android:name=\".CameraActivity\" android:exported=\"false\" />"
+    ],
+    "services": [],
+    "receivers": [],
+    "providers": [],
+    "meta_data": []
+  }
+}
+```
+
+#### iOS
+
+```json
+{
+  "ios": {
+    "info_plist": {
+      "NSCameraUsageDescription": "We need camera access to scan QR codes",
+      "NSMicrophoneUsageDescription": "We need microphone access for video recording"
+    },
+    "repositories": [],
+    "dependencies": {
+      "swift_packages": [
+        {
+          "url": "https://github.com/example/Package.git",
+          "version": "1.0.0"
+        }
+      ],
+      "pods": [
+        {
+          "name": "GoogleMLKit/BarcodeScanning",
+          "version": "~> 4.0.0"
+        }
+      ]
+    },
+    "entitlements": [],
+    "capabilities": [],
+    "background_modes": []
+  }
+}
+```
+
+### Assets
+
+Declare static assets to copy during build:
+
+```json
+{
+  "assets": {
+    "android": {
+      "android/model.tflite": "assets/model.tflite",
+      "android/labels.txt": "assets/labels.txt"
+    },
+    "ios": {
+      "ios/model.mlmodelc": "Resources/model.mlmodelc"
+    }
+  }
+}
+```
+
+### Events
+
+List Laravel events your plugin dispatches:
+
+```json
+{
+  "events": [
+    "MyCompany\\Example\\Events\\ExampleCompleted",
+    "MyCompany\\Example\\Events\\ExampleFailed"
+  ]
+}
+```
+
+### Hooks
+
+Register commands that run during build phases:
+
+```json
+{
+  "hooks": {
+    "copy_assets": "nativephp:example:copy-assets",
+    "pre_compile": "nativephp:example:prepare",
+    "post_compile": "nativephp:example:finalize",
+    "post_build": "nativephp:example:verify"
+  }
+}
+```
+
+**Available hooks:**
+- `pre_compile` - Before native code compilation
+- `post_compile` - After native code compilation
+- `copy_assets` - Copy ML models, binaries, etc.
+- `post_build` - After native build completes
+
+### Secrets
+
+Declare required environment variables:
+
+```json
+{
+  "secrets": {
+    "MY_API_KEY": {
+      "description": "API key for the service",
+      "required": true
+    },
+    "MY_OPTIONAL_KEY": {
+      "description": "Optional configuration",
+      "required": false
+    }
+  }
+}
+```
+
+## Native Implementation
+
+### Android (Kotlin)
+
+Implement bridge functions in `resources/android/YourPluginFunctions.kt`:
+
+```kotlin
+package com.example.plugins.example
+
+import androidx.fragment.app.FragmentActivity
+import android.content.Context
+import com.nativephp.mobile.bridge.BridgeFunction
+import com.nativephp.mobile.bridge.BridgeResponse
+
+object ExampleFunctions {
+
+    class Execute(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            // Get parameters
+            val option1 = parameters["option1"] as? String ?: ""
+            
+            try {
+                // Your native Android code here
+                val result = performAction(option1)
+                
+                // Return success
+                return BridgeResponse.success(mapOf(
+                    "result" to result,
+                    "timestamp" to System.currentTimeMillis()
+                ))
+            } catch (e: Exception) {
+                // Return error
+                return BridgeResponse.error(e.message ?: "Unknown error")
+            }
+        }
+        
+        private fun performAction(option: String): String {
+            // Implementation
+            return "Executed with $option"
+        }
+    }
+
+    class GetStatus(private val context: Context) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            return BridgeResponse.success(mapOf(
+                "status" to "ready",
+                "version" to "1.0.0"
+            ))
+        }
+    }
+}
+```
+
+### iOS (Swift)
+
+Implement bridge functions in `resources/ios/YourPluginFunctions.swift`:
+
+```swift
+import Foundation
+import UIKit
+
+enum ExampleFunctions {
+
+    class Execute: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            // Get parameters
+            let option1 = parameters["option1"] as? String ?? ""
+            
+            // Your native iOS code here
+            let result = performAction(option: option1)
+            
+            // Return success
+            return BridgeResponse.success(data: [
+                "result": result,
+                "timestamp": Date().timeIntervalSince1970
+            ])
+        }
+        
+        private func performAction(option: String) -> String {
+            // Implementation
+            return "Executed with \(option)"
+        }
+    }
+
+    class GetStatus: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return BridgeResponse.success(data: [
+                "status": "ready",
+                "version": "1.0.0"
+            ])
+        }
+    }
+}
+```
+
+## PHP Implementation
+
+Call native code from PHP in `src/Example.php`:
+
+```php
+<?php
+
+namespace MyCompany\Example;
+
+class Example
+{
+    /**
+     * Execute the plugin functionality
+     */
+    public function execute(array $options = []): mixed
+    {
+        if (function_exists('nativephp_call')) {
+            $result = nativephp_call('Example.Execute', json_encode($options));
+
+            if ($result) {
+                $decoded = json_decode($result);
+                return $decoded->data ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the current status
+     */
+    public function getStatus(): ?object
+    {
+        if (function_exists('nativephp_call')) {
+            $result = nativephp_call('Example.GetStatus', '{}');
+
+            if ($result) {
+                $decoded = json_decode($result);
+                return $decoded->data ?? null;
+            }
+        }
+
+        return null;
+    }
+}
+```
+
+## Lifecycle Hooks
+
+Create hook commands that extend `NativePluginHookCommand`:
+
+```php
+<?php
+
+namespace MyCompany\Example\Commands;
+
+use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
+
+class CopyAssetsCommand extends NativePluginHookCommand
+{
+    protected $signature = 'nativephp:example:copy-assets';
+    protected $description = 'Copy assets for Example plugin';
+
+    public function handle(): int
+    {
+        if ($this->isAndroid()) {
+            $this->copyAndroidAssets();
+        }
+
+        if ($this->isIos()) {
+            $this->copyIosAssets();
+        }
+
+        return self::SUCCESS;
+    }
+
+    protected function copyAndroidAssets(): void
+    {
+        // Copy a TensorFlow Lite model to Android assets
+        $this->copyToAndroidAssets('model.tflite', 'model.tflite');
+        
+        // Download a model if not present locally
+        $modelPath = $this->pluginPath() . '/resources/model.tflite';
+        $this->downloadIfMissing(
+            'https://example.com/model.tflite',
+            $modelPath
+        );
+        
+        $this->info('Android assets copied');
+    }
+
+    protected function copyIosAssets(): void
+    {
+        // Copy a Core ML model to iOS bundle
+        $this->copyToIosBundle('model.mlmodelc', 'model.mlmodelc');
+        
+        $this->info('iOS assets copied');
+    }
+}
+```
+
+**Available methods:**
+- `$this->isAndroid()` - Check if building for Android
+- `$this->isIos()` - Check if building for iOS
+- `$this->pluginPath()` - Get plugin directory path
+- `$this->buildPath()` - Get native build directory path
+- `$this->copyToAndroidAssets($source, $dest)` - Copy to Android assets
+- `$this->copyToIosBundle($source, $dest)` - Copy to iOS bundle
+- `$this->downloadIfMissing($url, $path)` - Download file if missing
+
+## Compiling Native Code
+
+### Android Compilation
+
+Kotlin files in `resources/android/` are automatically compiled during the build process:
+
+1. Files are copied to the Android project's `app/src/main/java/` directory
+2. Gradle compiles them alongside the main app code
+3. Bridge functions are registered automatically
+
+**Package structure:**
+```
+resources/android/
+├── ExampleFunctions.kt
+├── helpers/
+│   └── Utils.kt
+└── models/
+    └── DataModel.kt
+```
+
+### iOS Compilation
+
+Swift files in `resources/ios/` are automatically compiled:
+
+1. Files are added to the Xcode project
+2. Swift compiler builds them with the main app
+3. Bridge functions are registered automatically
+
+**File structure:**
+```
+resources/ios/
+├── ExampleFunctions.swift
+├── Helpers/
+│   └── Utils.swift
+└── Models/
+    └── DataModel.swift
+```
+
+## Testing Your Plugin
+
+The plugin generator creates a test suite in `tests/PluginTest.php`:
+
+```bash
+cd packages/my-company/plugin-example
+composer install
+./vendor/bin/pest
+```
+
+Tests validate:
+- Manifest structure and required fields
+- Bridge function definitions
+- Native code files exist and contain expected classes
+- PHP class structure
+- Lifecycle hook configuration
+
+## Publishing Your Plugin
+
+<Steps>
+  <Step title="Prepare for release">
+    1. Update `README.md` with usage instructions
+    2. Add examples and documentation
+    3. Run tests: `./vendor/bin/pest`
+    4. Validate manifest: `php artisan native:plugin:validate .`
+  </Step>
+  
+  <Step title="Tag a version">
+    ```bash
+    git tag v1.0.0
+    git push --tags
+    ```
+  </Step>
+  
+  <Step title="Publish to Packagist">
+    Submit your repository to [Packagist.org](https://packagist.org)
+  </Step>
+  
+  <Step title="Share with the community">
+    Share your plugin in the [NativePHP Discord](https://discord.gg/nativephp)
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use semantic versioning">
+    Follow [SemVer](https://semver.org) for version numbers:
+    - Major version for breaking changes
+    - Minor version for new features
+    - Patch version for bug fixes
+  </Accordion>
+  
+  <Accordion title="Document permissions clearly">
+    Explain why each permission is needed in your README so users understand what they're granting.
+  </Accordion>
+  
+  <Accordion title="Provide fallback behavior">
+    Handle cases where native functionality isn't available or fails gracefully.
+  </Accordion>
+  
+  <Accordion title="Test on both platforms">
+    Ensure your plugin works correctly on both iOS and Android before releasing.
+  </Accordion>
+  
+  <Accordion title="Keep dependencies minimal">
+    Only include necessary native dependencies to avoid bloating the app size.
+  </Accordion>
+  
+  <Accordion title="Use events for async operations">
+    Dispatch Laravel events from native code for long-running operations.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Plugin System Overview" icon="puzzle-piece" href="/advanced/plugins">
+    Learn how the plugin system works
+  </Card>
+  <Card title="Permissions" icon="shield-check" href="/advanced/permissions">
+    Configure native permissions for your plugin
+  </Card>
+</CardGroup>

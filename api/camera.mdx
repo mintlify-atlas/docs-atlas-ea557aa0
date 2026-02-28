@@ -1,0 +1,427 @@
+---
+title: Camera
+description: Capture photos, record videos, and select media from the device gallery
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Camera;
+```
+
+## Methods
+
+### getPhoto()
+
+Capture a photo using the device camera. Opens the native camera app for photo capture.
+
+<ParamField path="options" type="array" default="[]">
+  Optional configuration options for photo capture
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Camera;
+
+$photo = Camera::getPhoto();
+```
+
+<ResponseField name="return" type="PendingPhotoCapture">
+  A pending photo capture instance for fluent configuration
+</ResponseField>
+
+**Events:** Triggers `PhotoTaken` or `PhotoCancelled` events.
+
+### pickImages()
+
+Open the device gallery to select images and/or videos.
+
+<ParamField path="media_type" type="string" default="all">
+  Type of media to allow: `'image'`, `'video'`, or `'all'`
+</ParamField>
+
+<ParamField path="multiple" type="bool" default="false">
+  Allow multiple selection
+</ParamField>
+
+<ParamField path="max_items" type="int" default="10">
+  Maximum number of items when multiple=true
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Camera;
+
+// Pick a single image or video
+$picker = Camera::pickImages();
+
+// Pick multiple images only
+$picker = Camera::pickImages('image', true, 5);
+```
+
+<ResponseField name="return" type="PendingMediaPicker">
+  A pending media picker instance for fluent configuration
+</ResponseField>
+
+**Events:** Triggers `MediaSelected` event.
+
+### recordVideo()
+
+Record a video using the device camera. Opens the native camera app for video recording.
+
+<ParamField path="options" type="array" default="[]">
+  Optional recording options (e.g., `maxDuration`)
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Camera;
+
+$video = Camera::recordVideo();
+
+// With max duration
+$video = Camera::recordVideo(['maxDuration' => 30]);
+```
+
+<ResponseField name="return" type="PendingVideoRecorder">
+  A pending video recorder instance for fluent configuration
+</ResponseField>
+
+**Events:** Triggers `VideoRecorded` or `VideoCancelled` events.
+
+## PendingPhotoCapture Methods
+
+### id()
+
+Set a unique identifier for this photo capture to correlate with events.
+
+<ParamField path="id" type="string" required>
+  Unique identifier
+</ParamField>
+
+```php
+Camera::getPhoto()
+    ->id('profile-photo');
+```
+
+### getId()
+
+Get the photo capture's unique identifier.
+
+```php
+$pending = Camera::getPhoto();
+$id = $pending->getId(); // Returns UUID if not manually set
+```
+
+### event()
+
+Set a custom event class to dispatch when photo capture completes.
+
+<ParamField path="eventClass" type="string" required>
+  Fully qualified event class name
+</ParamField>
+
+```php
+Camera::getPhoto()
+    ->event(App\Events\ProfilePhotoTaken::class);
+```
+
+### remember()
+
+Store the photo capture ID in session for retrieval in event handlers.
+
+```php
+Camera::getPhoto()
+    ->id('photo-123')
+    ->remember();
+```
+
+### lastId()
+
+Retrieve the last remembered photo capture ID from session.
+
+```php
+$lastId = \Native\Mobile\PendingPhotoCapture::lastId();
+```
+
+### start()
+
+Explicitly start the photo capture (automatically called if not invoked).
+
+```php
+$success = Camera::getPhoto()
+    ->id('photo-123')
+    ->start();
+```
+
+## PendingVideoRecorder Methods
+
+### id()
+
+Set a unique identifier for this video recording.
+
+```php
+Camera::recordVideo()
+    ->id('video-123');
+```
+
+### getId()
+
+Get the video recorder's unique identifier.
+
+### event()
+
+Set a custom event class.
+
+### remember()
+
+Store the video recorder ID in session.
+
+### lastId()
+
+Retrieve the last remembered video recorder ID.
+
+### maxDuration()
+
+Set the maximum recording duration in seconds.
+
+<ParamField path="seconds" type="int" required>
+  Maximum duration in seconds
+</ParamField>
+
+```php
+Camera::recordVideo()
+    ->maxDuration(60); // 1 minute max
+```
+
+### start()
+
+Explicitly start the video recording.
+
+## PendingMediaPicker Methods
+
+### id()
+
+Set a unique identifier for this media picker.
+
+```php
+Camera::pickImages()
+    ->id('gallery-pick');
+```
+
+### getId()
+
+Get the media picker's unique identifier.
+
+### event()
+
+Set a custom event class.
+
+### mediaType()
+
+Set the type of media to pick.
+
+<ParamField path="type" type="string" required>
+  `'image'`, `'video'`, or `'all'`
+</ParamField>
+
+```php
+Camera::pickImages()
+    ->mediaType('image');
+```
+
+### images()
+
+Only allow image selection.
+
+```php
+Camera::pickImages()
+    ->images();
+```
+
+### videos()
+
+Only allow video selection.
+
+```php
+Camera::pickImages()
+    ->videos();
+```
+
+### all()
+
+Allow both images and videos (default).
+
+```php
+Camera::pickImages()
+    ->all();
+```
+
+### multiple()
+
+Allow multiple media selection.
+
+<ParamField path="multiple" type="bool" default="true">
+  Enable multiple selection
+</ParamField>
+
+<ParamField path="maxItems" type="int" default="10">
+  Maximum items to select
+</ParamField>
+
+```php
+Camera::pickImages()
+    ->multiple(true, 5);
+```
+
+### single()
+
+Only allow single media selection (default).
+
+```php
+Camera::pickImages()
+    ->single();
+```
+
+### remember()
+
+Store the media picker ID in session.
+
+### lastId()
+
+Retrieve the last remembered media picker ID.
+
+### start()
+
+Explicitly start the media picker.
+
+## Events
+
+### PhotoTaken
+
+Dispatched when a photo is successfully captured.
+
+**Properties:**
+- `path` (string) - File path to the captured photo
+- `mimeType` (string) - MIME type (default: 'image/jpeg')
+- `id` (string|null) - Tracking ID if set
+
+### PhotoCancelled
+
+Dispatched when photo capture is cancelled.
+
+**Properties:**
+- `cancelled` (bool) - Always true
+- `id` (string|null) - Tracking ID if set
+
+### VideoRecorded
+
+Dispatched when a video is successfully recorded.
+
+**Properties:**
+- `path` (string) - File path to the recorded video
+- `mimeType` (string) - MIME type (default: 'video/mp4')
+- `id` (string|null) - Tracking ID if set
+
+### VideoCancelled
+
+Dispatched when video recording is cancelled.
+
+**Properties:**
+- `cancelled` (bool) - Always true
+- `id` (string|null) - Tracking ID if set
+
+### MediaSelected
+
+Dispatched when media is selected from the gallery.
+
+**Properties:**
+- `success` (bool) - Whether selection succeeded
+- `files` (array) - Array of selected file information
+- `count` (int) - Number of files selected
+- `error` (string|null) - Error message if failed
+- `cancelled` (bool) - Whether user cancelled
+- `id` (string|null) - Tracking ID if set
+
+### PermissionDenied
+
+Dispatched when camera permission is denied.
+
+**Properties:**
+- `action` (string) - The attempted action: 'photo' or 'video'
+- `id` (string|null) - Tracking ID if set
+
+## Examples
+
+### Profile Photo Upload
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class ProfilePhoto extends Component
+{
+    public function takePhoto()
+    {
+        Camera::getPhoto()
+            ->id('profile-' . auth()->id())
+            ->remember();
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+    public function handlePhoto($data)
+    {
+        $user = auth()->user();
+        $user->updateProfilePhoto($data['path']);
+        
+        $this->dispatch('photo-uploaded');
+    }
+}
+```
+
+### Video Testimonial Recorder
+
+```php
+use Native\Mobile\Facades\Camera;
+
+public function recordTestimonial()
+{
+    Camera::recordVideo()
+        ->maxDuration(120) // 2 minutes max
+        ->id('testimonial-' . time())
+        ->remember();
+}
+```
+
+### Multi-Image Gallery Picker
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Gallery\MediaSelected;
+use Livewire\Attributes\On;
+
+class PostCreator extends Component
+{
+    public $attachments = [];
+    
+    public function addImages()
+    {
+        Camera::pickImages()
+            ->images()
+            ->multiple(true, 10)
+            ->id('post-images');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Gallery\\MediaSelected')]
+    public function handleMediaSelected($data)
+    {
+        if ($data['success']) {
+            foreach ($data['files'] as $file) {
+                $this->attachments[] = [
+                    'path' => $file['path'],
+                    'name' => $file['name'] ?? 'Untitled',
+                ];
+            }
+        }
+    }
+}
+```

@@ -1,0 +1,386 @@
+---
+title: Native Permissions
+description: Configure and request native device permissions for iOS and Android
+---
+
+NativePHP Mobile apps can request access to device features like the camera, location, microphone, and more. Permissions are configured in `config/nativephp.php` and requested at runtime when needed.
+
+## Configuring Permissions
+
+Add permissions to the `permissions` array in `config/nativephp.php`:
+
+```php
+'permissions' => [
+    'camera' => true,
+    'location' => 'We need your location to show nearby stores',
+    'microphone' => false,
+],
+```
+
+### Permission Formats
+
+**Boolean values:**
+- `true` - Permission enabled with default system message
+- `false` - Permission disabled
+
+**String values:**
+- iOS: Custom message shown when requesting permission
+- Android: Treated as `true` (custom messages not supported)
+
+<Tip>
+Provide descriptive strings for iOS to help users understand why your app needs each permission. This improves approval rates.
+</Tip>
+
+### Applying Changes
+
+After modifying permissions, rebuild the native configuration:
+
+```bash
+php artisan native:install --force
+php artisan native:run
+```
+
+## Common Permissions
+
+### Camera
+
+Request camera access for photos, videos, or QR scanning:
+
+```php
+'permissions' => [
+    'camera' => 'We need camera access to scan QR codes for login',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSCameraUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.CAMERA` to AndroidManifest.xml
+
+### Location
+
+Request location access for maps, geofencing, or location-based features:
+
+```php
+'permissions' => [
+    'location' => 'We need your location to show nearby stores and offers',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSLocationWhenInUseUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.ACCESS_FINE_LOCATION` and `android.permission.ACCESS_COARSE_LOCATION`
+
+<Warning>
+iOS requires separate permissions for background location tracking. Contact the NativePHP team if you need this feature.
+</Warning>
+
+### Microphone
+
+Request microphone access for audio recording:
+
+```php
+'permissions' => [
+    'microphone' => 'We need microphone access to record voice messages',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSMicrophoneUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.RECORD_AUDIO`
+
+### Photo Library
+
+Request access to the user's photo library:
+
+```php
+'permissions' => [
+    'photo_library' => 'We need access to your photos to upload them',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSPhotoLibraryUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.READ_EXTERNAL_STORAGE`
+
+### Notifications
+
+Request permission to send push notifications:
+
+```php
+'permissions' => [
+    'notifications' => 'We\'ll send you important updates about your orders',
+],
+```
+
+**Platforms:**
+- **iOS**: Requests notification permission at runtime
+- **Android**: Automatically granted (Android 12 and below) or requested (Android 13+)
+
+### Biometrics
+
+Request access to Face ID, Touch ID, or fingerprint authentication:
+
+```php
+'permissions' => [
+    'biometrics' => 'We use Face ID to secure your account',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSFaceIDUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.USE_BIOMETRIC`
+
+### Bluetooth
+
+Request access to Bluetooth for device pairing or communication:
+
+```php
+'permissions' => [
+    'bluetooth' => 'We need Bluetooth to connect to your devices',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSBluetoothAlwaysUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.BLUETOOTH` and `android.permission.BLUETOOTH_CONNECT` (Android 12+)
+
+### Contacts
+
+Request access to the user's contacts:
+
+```php
+'permissions' => [
+    'contacts' => 'We need access to your contacts to find friends',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSContactsUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.READ_CONTACTS`
+
+### Calendar
+
+Request access to the user's calendar:
+
+```php
+'permissions' => [
+    'calendar' => 'We need calendar access to create event reminders',
+],
+```
+
+**Platforms:**
+- **iOS**: Adds `NSCalendarsUsageDescription` to Info.plist
+- **Android**: Adds `android.permission.READ_CALENDAR` and `android.permission.WRITE_CALENDAR`
+
+## Platform-Specific Permissions
+
+Some permissions are platform-specific and require custom configuration.
+
+### iOS Info.plist Keys
+
+For advanced iOS permissions not covered by the simple format, you can add custom Info.plist entries via a plugin:
+
+```json
+// In a plugin's nativephp.json
+{
+  "ios": {
+    "info_plist": {
+      "NSMotionUsageDescription": "We use motion data to track your workouts",
+      "NSHealthShareUsageDescription": "We read your health data to provide insights",
+      "NSHealthUpdateUsageDescription": "We write workout data to your health app"
+    }
+  }
+}
+```
+
+**Common iOS Info.plist keys:**
+- `NSCameraUsageDescription` - Camera
+- `NSPhotoLibraryUsageDescription` - Photo library read
+- `NSPhotoLibraryAddUsageDescription` - Photo library write
+- `NSMicrophoneUsageDescription` - Microphone
+- `NSLocationWhenInUseUsageDescription` - Location (when in use)
+- `NSLocationAlwaysUsageDescription` - Location (always)
+- `NSContactsUsageDescription` - Contacts
+- `NSCalendarsUsageDescription` - Calendars
+- `NSRemindersUsageDescription` - Reminders
+- `NSMotionUsageDescription` - Motion & fitness
+- `NSBluetoothAlwaysUsageDescription` - Bluetooth
+- `NSFaceIDUsageDescription` - Face ID
+- `NSSpeechRecognitionUsageDescription` - Speech recognition
+- `NSHealthShareUsageDescription` - Health (read)
+- `NSHealthUpdateUsageDescription` - Health (write)
+
+### Android Permissions
+
+For advanced Android permissions, add them via a plugin manifest:
+
+```json
+// In a plugin's nativephp.json
+{
+  "android": {
+    "permissions": [
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_BACKGROUND_LOCATION",
+      "android.permission.ACTIVITY_RECOGNITION"
+    ]
+  }
+}
+```
+
+**Common Android permissions:**
+- `android.permission.CAMERA` - Camera
+- `android.permission.RECORD_AUDIO` - Microphone
+- `android.permission.ACCESS_FINE_LOCATION` - Precise location
+- `android.permission.ACCESS_COARSE_LOCATION` - Approximate location
+- `android.permission.ACCESS_BACKGROUND_LOCATION` - Background location (Android 10+)
+- `android.permission.READ_EXTERNAL_STORAGE` - Read files
+- `android.permission.WRITE_EXTERNAL_STORAGE` - Write files
+- `android.permission.READ_CONTACTS` - Read contacts
+- `android.permission.WRITE_CONTACTS` - Write contacts
+- `android.permission.READ_CALENDAR` - Read calendar
+- `android.permission.WRITE_CALENDAR` - Write calendar
+- `android.permission.BLUETOOTH` - Bluetooth (legacy)
+- `android.permission.BLUETOOTH_CONNECT` - Bluetooth connect (Android 12+)
+- `android.permission.BLUETOOTH_SCAN` - Bluetooth scan (Android 12+)
+- `android.permission.USE_BIOMETRIC` - Biometric authentication
+- `android.permission.ACTIVITY_RECOGNITION` - Activity recognition (Android 10+)
+- `android.permission.POST_NOTIFICATIONS` - Push notifications (Android 13+)
+
+## Requesting Permissions at Runtime
+
+Some permissions must be requested at runtime when the user attempts to use a feature.
+
+### Using NativePHP Facades
+
+Most NativePHP facades automatically request permissions when needed:
+
+```php
+use Native\Mobile\Facades\Camera;
+
+// Permission will be requested automatically
+$photo = Camera::takePicture();
+```
+
+### Manual Permission Requests
+
+For custom permission handling, use the Permission facade:
+
+```php
+use Native\Mobile\Facades\Permission;
+
+// Check if permission is granted
+if (Permission::check('camera')) {
+    // Camera permission granted
+}
+
+// Request permission
+Permission::request('camera', function ($granted) {
+    if ($granted) {
+        // Permission granted
+    } else {
+        // Permission denied
+    }
+});
+```
+
+## Permission Status
+
+Permissions can be in one of several states:
+
+- **Not Determined** - User hasn't been asked yet (iOS only)
+- **Granted** - User granted permission
+- **Denied** - User denied permission
+- **Restricted** - Permission restricted by parental controls or device policy (iOS only)
+
+### Checking Permission Status
+
+```php
+use Native\Mobile\Facades\Permission;
+
+$status = Permission::status('camera');
+
+if ($status === 'granted') {
+    // Can use camera
+} elseif ($status === 'denied') {
+    // Show message explaining why permission is needed
+} elseif ($status === 'not_determined') {
+    // Can request permission
+}
+```
+
+## Handling Permission Denials
+
+If users deny a permission, provide guidance on how to enable it in system settings:
+
+```php
+use Native\Mobile\Facades\Permission;
+
+Permission::request('camera', function ($granted) {
+    if (!$granted) {
+        // Show alert with instructions
+        $this->dispatch('show-alert', [
+            'title' => 'Camera Permission Required',
+            'message' => 'Please enable camera access in Settings to use this feature.',
+            'actions' => [
+                ['label' => 'Open Settings', 'action' => 'open-settings'],
+                ['label' => 'Cancel', 'action' => 'dismiss'],
+            ],
+        ]);
+    }
+});
+```
+
+### Opening System Settings
+
+Direct users to your app's settings page:
+
+```php
+use Native\Mobile\Facades\App;
+
+App::openSettings();
+```
+
+## Permission Best Practices
+
+<AccordionGroup>
+  <Accordion title="Request permissions in context">
+    Always request permissions when the user is about to use a feature, not on app launch. This provides context and improves approval rates.
+  </Accordion>
+  
+  <Accordion title="Explain why permissions are needed">
+    Provide clear, user-friendly explanations for each permission. Users are more likely to grant permissions when they understand the benefit.
+  </Accordion>
+  
+  <Accordion title="Handle denials gracefully">
+    If a permission is denied, provide alternative functionality or clear instructions on how to enable it.
+  </Accordion>
+  
+  <Accordion title="Don't request all permissions upfront">
+    Only request permissions as they're needed. Requesting too many permissions at once can overwhelm users.
+  </Accordion>
+  
+  <Accordion title="Test permission flows">
+    Test your app with permissions both granted and denied to ensure a good experience in all cases.
+  </Accordion>
+  
+  <Accordion title="Update after configuration changes">
+    Always run `php artisan native:install --force` after changing permissions in the config file.
+  </Accordion>
+</AccordionGroup>
+
+## Plugin Permissions
+
+Plugins can declare required permissions in their `nativephp.json` manifest. These are automatically added to your app when the plugin is installed.
+
+See [Custom Plugins](/advanced/custom-plugins#platform-specific-configuration) for details on configuring plugin permissions.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Camera & Photos" icon="camera" href="/features/camera">
+    Learn how to use the Camera API
+  </Card>
+  <Card title="Location" icon="location-dot" href="/features/geolocation">
+    Access device location
+  </Card>
+</CardGroup>

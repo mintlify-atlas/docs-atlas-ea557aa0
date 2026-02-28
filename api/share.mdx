@@ -1,0 +1,344 @@
+---
+title: Share
+description: Share content via the native share sheet
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Share;
+```
+
+## Methods
+
+### url()
+
+Share a URL with title and text via the native share sheet.
+
+<ParamField path="title" type="string" required>
+  The share title
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  The share message text
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  The URL to share
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Share;
+
+Share::url(
+    'Check out NativePHP',
+    'Build native mobile apps with PHP!',
+    'https://nativephp.com'
+);
+```
+
+### file()
+
+Share a file via the native share sheet.
+
+<ParamField path="title" type="string" required>
+  The share title
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  The share message text
+</ParamField>
+
+<ParamField path="filePath" type="string" required>
+  The absolute path to the file to share
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Share;
+
+Share::file(
+    'My Photo',
+    'Check out this photo!',
+    '/path/to/photo.jpg'
+);
+```
+
+## Examples
+
+### Share Article Link
+
+```php
+use Native\Mobile\Facades\Share;
+use Livewire\Component;
+
+class ArticleShare extends Component
+{
+    public $article;
+    
+    public function shareArticle()
+    {
+        Share::url(
+            $this->article->title,
+            'I thought you might enjoy this article!',
+            route('articles.show', $this->article)
+        );
+    }
+}
+```
+
+### Share App Referral
+
+```php
+use Native\Mobile\Facades\Share;
+
+class ReferralShare extends Component
+{
+    public function shareReferralLink()
+    {
+        $referralCode = auth()->user()->referral_code;
+        $referralUrl = "https://example.com/join?ref={$referralCode}";
+        
+        Share::url(
+            'Join me on this app!',
+            "Use my referral code {$referralCode} to get started.",
+            $referralUrl
+        );
+    }
+}
+```
+
+### Share Generated Image
+
+```php
+use Native\Mobile\Facades\Share;
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Livewire\Attributes\On;
+
+class PhotoShare extends Component
+{
+    public $photoPath = null;
+    
+    public function takePhoto()
+    {
+        Camera::getPhoto()->id('share-photo');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Camera\\PhotoTaken')]
+    public function handlePhoto($data)
+    {
+        $this->photoPath = $data['path'];
+    }
+    
+    public function sharePhoto()
+    {
+        if ($this->photoPath) {
+            Share::file(
+                'My Photo',
+                'Check out this photo I just took!',
+                $this->photoPath
+            );
+        }
+    }
+}
+```
+
+### Share Document
+
+```php
+use Native\Mobile\Facades\Share;
+
+class DocumentShare extends Component
+{
+    public function shareDocument(Document $document)
+    {
+        $path = storage_path('app/' . $document->file_path);
+        
+        Share::file(
+            $document->title,
+            'Sharing document: ' . $document->title,
+            $path
+        );
+    }
+    
+    public function exportAndShare()
+    {
+        // Generate PDF
+        $pdf = PDF::loadView('documents.export', ['document' => $this->document]);
+        $path = storage_path('app/temp/export.pdf');
+        $pdf->save($path);
+        
+        // Share it
+        Share::file(
+            $this->document->title,
+            'Here is the exported document',
+            $path
+        );
+    }
+}
+```
+
+### Share User Profile
+
+```php
+use Native\Mobile\Facades\Share;
+
+class ProfileShare extends Component
+{
+    public $user;
+    
+    public function shareProfile()
+    {
+        Share::url(
+            "Check out {$this->user->name}'s profile",
+            "{$this->user->name} is on our platform!",
+            route('profile.show', $this->user->username)
+        );
+    }
+}
+```
+
+### Share Achievement
+
+```php
+use Native\Mobile\Facades\Share;
+
+class AchievementShare extends Component
+{
+    public function shareAchievement(Achievement $achievement)
+    {
+        // Generate achievement image
+        $imagePath = $this->generateAchievementImage($achievement);
+        
+        Share::file(
+            'New Achievement!',
+            "I just unlocked: {$achievement->name}",
+            $imagePath
+        );
+    }
+    
+    private function generateAchievementImage(Achievement $achievement): string
+    {
+        // Use image generation library to create achievement card
+        // Save to temp location and return path
+        return storage_path('app/temp/achievement.png');
+    }
+}
+```
+
+### Share Location
+
+```php
+use Native\Mobile\Facades\Share;
+use Native\Mobile\Facades\Geolocation;
+
+class LocationShare extends Component
+{
+    public $latitude;
+    public $longitude;
+    
+    public function shareLocation()
+    {
+        if ($this->latitude && $this->longitude) {
+            $mapsUrl = "https://maps.google.com/?q={$this->latitude},{$this->longitude}";
+            
+            Share::url(
+                'My Location',
+                'Here is where I am right now!',
+                $mapsUrl
+            );
+        }
+    }
+}
+```
+
+### Share with Context
+
+```php
+use Native\Mobile\Facades\Share;
+use Native\Mobile\Facades\Dialog;
+
+class ContextualShare extends Component
+{
+    public function shareContent(string $type, array $data)
+    {
+        match($type) {
+            'url' => $this->shareUrl($data),
+            'image' => $this->shareImage($data),
+            'video' => $this->shareVideo($data),
+            default => Dialog::alert('Error', 'Unsupported share type', ['OK']),
+        };
+    }
+    
+    private function shareUrl(array $data)
+    {
+        Share::url(
+            $data['title'],
+            $data['description'],
+            $data['url']
+        );
+    }
+    
+    private function shareImage(array $data)
+    {
+        Share::file(
+            $data['title'],
+            $data['description'],
+            $data['path']
+        );
+    }
+    
+    private function shareVideo(array $data)
+    {
+        Share::file(
+            $data['title'],
+            $data['description'],
+            $data['path']
+        );
+    }
+}
+```
+
+### Share Button Component
+
+```php
+use Native\Mobile\Facades\Share;
+use Livewire\Component;
+
+class ShareButton extends Component
+{
+    public $title;
+    public $text;
+    public $url;
+    
+    public function share()
+    {
+        try {
+            Share::url(
+                $this->title,
+                $this->text,
+                $this->url
+            );
+        } catch (\Exception $e) {
+            Dialog::alert(
+                'Share Failed',
+                'Unable to share content. Please try again.',
+                ['OK']
+            );
+        }
+    }
+    
+    public function render()
+    {
+        return view('livewire.share-button');
+    }
+}
+```
+
+```blade
+<!-- resources/views/livewire/share-button.blade.php -->
+<button wire:click="share" class="share-btn">
+    <svg><!-- Share icon --></svg>
+    Share
+</button>
+```

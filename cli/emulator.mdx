@@ -1,0 +1,152 @@
+---
+title: native:emulator
+description: List and launch an emulator
+---
+
+Launches an Android emulator for testing your application.
+
+## Syntax
+
+```bash
+php artisan native:emulator {os}
+```
+
+## Arguments
+
+### os
+
+The platform to launch emulator for. Required.
+
+- `android` - Launch Android emulator
+- `ios` - Launch iOS Simulator (launches Android instead currently)
+
+## Examples
+
+### Launch Android emulator
+
+```bash
+php artisan native:emulator android
+```
+
+## What it does
+
+1. Lists available Android emulators (AVDs)
+2. Prompts you to select one
+3. Launches the selected emulator
+4. Waits for emulator to boot
+
+## Requirements
+
+### Android Emulator
+
+Requires Android SDK with emulator:
+
+1. Install Android Studio
+2. Open SDK Manager (Tools > SDK Manager)
+3. Install "Android Emulator" under SDK Tools
+4. Create AVDs via AVD Manager (Tools > Device Manager)
+
+### Creating AVDs
+
+If you have no emulators:
+
+1. Open Android Studio
+2. Tools > Device Manager
+3. Click "Create Device"
+4. Choose device (e.g., Pixel 6)
+5. Download a system image (e.g., Android 13)
+6. Finish creation
+
+## Common workflows
+
+### Launch emulator before running
+
+```bash
+php artisan native:emulator android
+php artisan native:run android
+```
+
+### Check running emulators
+
+```bash
+adb devices
+```
+
+Shows:
+```
+List of devices attached
+emulator-5554   device
+```
+
+## Alternative: iOS Simulator
+
+For iOS, use the simulator command directly:
+
+```bash
+# List available simulators
+xcrun simctl list devices
+
+# Boot a specific simulator
+xcrun simctl boot "iPhone 15 Pro"
+
+# Open Simulator app
+open -a Simulator
+```
+
+Or let `native:run` launch automatically:
+
+```bash
+php artisan native:run ios
+```
+
+## Troubleshooting
+
+### "No emulators found"
+
+Create an AVD in Android Studio:
+
+1. Tools > Device Manager
+2. Create Device
+3. Follow wizard
+
+### "emulator: command not found"
+
+Add Android SDK to PATH:
+
+```bash
+# macOS/Linux - add to ~/.bashrc or ~/.zshrc
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+
+# Windows - add to System Environment Variables
+# ANDROID_HOME = C:\Users\YourName\AppData\Local\Android\Sdk
+# Path += %ANDROID_HOME%\emulator
+# Path += %ANDROID_HOME%\platform-tools
+```
+
+### Emulator won't boot
+
+Try:
+
+```bash
+# Kill existing emulator processes
+adb kill-server
+adb start-server
+
+# Or from AVD Manager
+# Tools > Device Manager > Right-click AVD > Wipe Data
+```
+
+### Slow emulator performance
+
+Enable hardware acceleration:
+
+- **Windows**: Enable Intel HAXM or AMD Hypervisor
+- **macOS**: Enable Hypervisor Framework (automatic)
+- **Linux**: Enable KVM
+
+## See also
+
+- [native:run](/cli/run) - Run app on emulator
+- [native:open](/cli/open-project-project) - Open Android Studio

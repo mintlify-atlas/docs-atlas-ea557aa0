@@ -1,0 +1,184 @@
+---
+title: native:watch
+description: Watch for file changes and sync to running mobile app
+---
+
+Enables hot reloading for mobile app development by watching your Laravel application files and automatically syncing changes to a running app.
+
+## Syntax
+
+```bash
+php artisan native:watch [platform] [target] [options]
+```
+
+## Arguments
+
+### platform
+
+Platform to watch. Optional.
+
+- `android` or `a` - Watch Android app
+- `ios` or `i` - Watch iOS app
+
+If not specified, you'll be prompted to choose.
+
+### target
+
+The device/simulator UDID to watch. Optional.
+
+For iOS, specifies which simulator to sync changes to.
+
+## Options
+
+### --ios
+
+Target iOS platform (shorthand for `platform=ios`).
+
+```bash
+php artisan native:watch --ios
+```
+
+### --android
+
+Target Android platform (shorthand for `platform=android`).
+
+```bash
+php artisan native:watch --android
+```
+
+## Examples
+
+### Watch Android app
+
+```bash
+php artisan native:watch android
+```
+
+### Watch iOS app on specific simulator
+
+```bash
+php artisan native:watch ios SIMULATOR-UDID
+```
+
+### Watch using shorthand flags
+
+```bash
+php artisan native:watch --ios
+```
+
+## Requirements
+
+### Watchman
+
+This command requires Facebook's Watchman file watcher:
+
+**macOS**
+```bash
+brew install watchman
+```
+
+**Linux**
+```bash
+# See https://facebook.github.io/watchman/docs/install
+```
+
+**Windows**
+```bash
+choco install watchman
+```
+
+## What it does
+
+1. **Checks dependencies**: Verifies Watchman is installed
+2. **Starts file watcher**: Monitors your Laravel application directory
+3. **Detects changes**: Watches for file modifications, additions, deletions
+4. **Syncs to device**: Pushes changes to the running mobile app
+5. **Reloads app**: Triggers automatic reload in the mobile app
+
+## How it works
+
+### Android
+
+- Uses `adb push` to sync files to the device
+- Monitors `app/`, `config/`, `resources/`, `routes/` directories
+- Triggers app reload via intent broadcast
+
+### iOS
+
+- Uses iOS Simulator's file sharing to sync files
+- Monitors same directories as Android
+- Triggers app reload via URL scheme
+
+## Watched directories
+
+By default, watches:
+
+- `app/` - Application code
+- `config/` - Configuration files
+- `resources/` - Views, assets
+- `routes/` - Route definitions
+- `public/` - Public assets
+
+Changes to `vendor/`, `node_modules/`, and `storage/` are ignored.
+
+## Workflow
+
+Typical development workflow with watch:
+
+1. Start the app with watch enabled:
+   ```bash
+   php artisan native:run android --watch
+   ```
+
+2. Or start watch separately while app is running:
+   ```bash
+   php artisan native:watch android
+   ```
+
+3. Edit your code in your IDE
+4. Save the file
+5. Changes automatically sync and app reloads
+6. See changes in seconds!
+
+## Performance tips
+
+- **Frontend assets**: Use Vite's dev server for faster CSS/JS updates
+- **Large files**: Exclude from watch if not needed
+- **Multiple devices**: Run separate watch processes for each
+
+## Troubleshooting
+
+### Watchman not found
+
+```bash
+# Install watchman
+brew install watchman  # macOS
+```
+
+### Changes not syncing
+
+1. Check device is connected: `adb devices` (Android)
+2. Verify app is running
+3. Check Watchman is running: `watchman watch-list`
+4. Restart watch command
+
+### Slow syncing
+
+- Check network connection (iOS Simulator)
+- Reduce number of watched files
+- Clear Watchman cache: `watchman watch-del-all`
+
+## Alternative: Run with --watch
+
+You can also enable watch mode when running the app:
+
+```bash
+php artisan native:run android --watch
+```
+
+This combines `native:run` and `native:watch` in a single command.
+
+## See also
+
+- [native:run](/cli/run) - Build and run with --watch option
+- [native:tail](/cli/tail) - View app logs in real-time

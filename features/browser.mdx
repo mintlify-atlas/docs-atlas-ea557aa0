@@ -1,0 +1,252 @@
+---
+title: Browser
+description: Open URLs in the system browser, in-app browser, or authentication sessions for OAuth flows.
+---
+
+The Browser API provides methods to open URLs in different browser contexts, including the system's default browser, an in-app browser window, or a secure authentication session for OAuth flows.
+
+## Usage
+
+Open a URL in the system browser:
+
+```php
+use Native\Mobile\Facades\Browser;
+
+Browser::open('https://example.com');
+```
+
+## Methods
+
+### `open(string $url)`
+
+Opens a URL in the device's default system browser (Safari on iOS, Chrome/default on Android).
+
+**Parameters:**
+- `$url` (string) - The URL to open
+
+**Returns:** `bool` - True if successfully opened
+
+**Example:**
+```php
+Browser::open('https://nativephp.com');
+```
+
+### `inApp(string $url)`
+
+Opens a URL in an in-app browser window that remains within your application.
+
+**Parameters:**
+- `$url` (string) - The URL to open (must be a valid URL)
+
+**Returns:** `bool` - True if successfully opened
+
+**Throws:** `InvalidArgumentException` - If URL is invalid
+
+**Example:**
+```php
+Browser::inApp('https://example.com/help');
+```
+
+<Note>
+**iOS:** Uses `SFSafariViewController` which provides a Safari-like experience
+**Android:** Uses Chrome Custom Tabs for a seamless browsing experience
+</Note>
+
+### `auth(string $url)`
+
+Opens a URL in a secure authentication session, ideal for OAuth flows and social login.
+
+**Parameters:**
+- `$url` (string) - The authentication URL to open
+
+**Returns:** `bool` - True if successfully opened
+
+**Example:**
+```php
+Browser::auth('https://accounts.google.com/o/oauth2/auth?...');
+```
+
+<Note>
+This method automatically handles OAuth callbacks using your configured deeplink scheme. The authentication session will close automatically when the callback URL is triggered.
+</Note>
+
+## Examples
+
+### Opening External Links
+
+```php
+use Native\Mobile\Facades\Browser;
+
+// Open documentation in system browser
+public function openDocs()
+{
+    Browser::open('https://docs.example.com');
+}
+
+// Open terms of service in-app
+public function showTerms()
+{
+    Browser::inApp('https://example.com/terms');
+}
+```
+
+### OAuth Authentication Flow
+
+```php
+use Native\Mobile\Facades\Browser;
+use Illuminate\Support\Facades\Http;
+
+public function loginWithGoogle()
+{
+    $clientId = config('services.google.client_id');
+    $redirectUri = config('services.google.redirect');
+    
+    $params = http_build_query([
+        'client_id' => $clientId,
+        'redirect_uri' => $redirectUri,
+        'response_type' => 'code',
+        'scope' => 'email profile',
+    ]);
+    
+    $authUrl = "https://accounts.google.com/o/oauth2/auth?{$params}";
+    
+    // Open authentication session
+    Browser::auth($authUrl);
+    
+    // The callback will be handled by your deeplink route
+}
+
+// In your deeplink handler
+Route::get('/auth/google/callback', function (Request $request) {
+    $code = $request->get('code');
+    
+    // Exchange code for access token
+    $response = Http::post('https://oauth2.googleapis.com/token', [
+        'code' => $code,
+        'client_id' => config('services.google.client_id'),
+        'client_secret' => config('services.google.client_secret'),
+        'redirect_uri' => config('services.google.redirect'),
+        'grant_type' => 'authorization_code',
+    ]);
+    
+    $token = $response->json()['access_token'];
+    
+    // Authenticate user...
+});
+```
+
+### Error Handling
+
+```php
+use Native\Mobile\Facades\Browser;
+
+public function openUrl(string $url)
+{
+    try {
+        $success = Browser::inApp($url);
+        
+        if (!$success) {
+            Log::error('Failed to open browser', ['url' => $url]);
+            return back()->withErrors(['message' => 'Could not open link']);
+        }
+        
+        return response()->json(['success' => true]);
+    } catch (\InvalidArgumentException $e) {
+        return back()->withErrors(['message' => 'Invalid URL provided']);
+    }
+}
+```
+
+### In-App Help System
+
+```php
+use Native\Mobile\Facades\Browser;
+
+class HelpController extends Controller
+{
+    public function show(string $topic)
+    {
+        $helpUrls = [
+            'getting-started' => 'https://help.example.com/getting-started',
+            'account' => 'https://help.example.com/account',
+            'billing' => 'https://help.example.com/billing',
+        ];
+        
+        if (!isset($helpUrls[$topic])) {
+            abort(404);
+        }
+        
+        // Open help article in-app
+        Browser::inApp($helpUrls[$topic]);
+        
+        return response()->json(['opened' => true]);
+    }
+}
+```
+
+### Social Sharing
+
+```php
+use Native\Mobile\Facades\Browser;
+
+public function shareOnTwitter(Post $post)
+{
+    $text = urlencode($post->title);
+    $url = urlencode(route('posts.show', $post));
+    
+    $twitterUrl = "https://twitter.com/intent/tweet?text={$text}&url={$url}";
+    
+    Browser::open($twitterUrl);
+}
+```
+
+## Platform Notes
+
+### iOS
+
+#### `open()`
+- Opens URLs in Safari
+- User leaves your app temporarily
+- Can return via app switcher or back button
+
+#### `inApp()`
+- Uses `SFSafariViewController`
+- Provides Safari features (Reader mode, autofill, etc.)
+- User stays within your app context
+- Has a "Done" button to dismiss
+- Shares cookies with Safari
+
+#### `auth()`
+- Uses `ASWebAuthenticationSession`
+- Secure and sandboxed environment
+- Automatically handles callback URLs
+- Shows a permission dialog on first use
+- Best for OAuth and social login flows
+
+### Android
+
+#### `open()`
+- Opens URLs in default browser (usually Chrome)
+- User leaves your app
+- Returns via back button or app switcher
+
+#### `inApp()`
+- Uses Chrome Custom Tabs
+- Faster loading (browser pre-warmed)
+- Maintains browser session
+- Smooth animations
+- Has a close button
+
+#### `auth()`
+- Uses Chrome Custom Tabs with callback handling
+- Secure OAuth flow
+- Automatically closes on callback
+- Handles deeplink redirection
+
+<Warning>
+The `inApp()` method validates URLs and will throw an `InvalidArgumentException` if the URL is malformed. Always validate user input before passing to this method.
+</Warning>
+
+<Note>
+For OAuth flows, make sure your app's deeplink scheme is properly configured in your app configuration. The `auth()` method relies on this to handle callbacks correctly.
+</Note>

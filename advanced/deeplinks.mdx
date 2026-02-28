@@ -1,0 +1,544 @@
+---
+title: Deep Links & URL Schemes
+description: Open your app from URLs, handle deep links, and integrate with NFC tags
+---
+
+Deep linking allows your NativePHP Mobile app to open from URLs, whether from web browsers, other apps, or NFC tags. Configure custom URL schemes and associate verified HTTPS domains.
+
+## Configuration
+
+Deep links are configured in `config/nativephp.php`:
+
+```php
+'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME'),
+'deeplink_host' => env('NATIVEPHP_DEEPLINK_HOST'),
+```
+
+Set these values in your `.env` file:
+
+```bash
+NATIVEPHP_DEEPLINK_SCHEME=myapp
+NATIVEPHP_DEEPLINK_HOST=example.com
+```
+
+### Applying Changes
+
+After configuring deep links, rebuild the native configuration:
+
+```bash
+php artisan native:install --force
+php artisan native:run
+```
+
+## URL Scheme Deep Links
+
+URL scheme deep links use a custom protocol to open your app:
+
+```
+myapp://path/to/page?param=value
+```
+
+### Choosing a URL Scheme
+
+Your URL scheme should be:
+- **Unique**: Avoid conflicts with other apps
+- **Lowercase**: Use only lowercase letters
+- **Memorable**: Easy for users to recognize
+- **Branded**: Related to your app or company name
+
+**Good examples:**
+- `nativephp://`
+- `mystore://`
+- `acmecorp://`
+
+**Avoid:**
+- Common words (`app://`, `open://`)
+- Generic terms (`link://`, `mobile://`)
+- Existing schemes (`http://`, `mailto://`)
+
+### Configuring URL Scheme
+
+```bash
+# .env
+NATIVEPHP_DEEPLINK_SCHEME=myapp
+```
+
+This allows URLs like:
+- `myapp://home`
+- `myapp://products/123`
+- `myapp://settings?tab=account`
+
+### Testing URL Schemes
+
+**iOS:**
+```bash
+xcrun simctl openurl booted myapp://home
+```
+
+**Android:**
+```bash
+adb shell am start -a android.intent.action.VIEW -d "myapp://home"
+```
+
+**From a web page:**
+```html
+<a href="myapp://products/123">Open in App</a>
+```
+
+## HTTPS Deep Links (Universal Links)
+
+HTTPS deep links allow regular web URLs to open your app when tapped:
+
+```
+https://example.com/products/123
+```
+
+If the app is installed, the link opens the app. If not, it opens in the browser.
+
+### Configuring HTTPS Deep Links
+
+```bash
+# .env
+NATIVEPHP_DEEPLINK_HOST=example.com
+```
+
+This allows URLs like:
+- `https://example.com/home`
+- `https://example.com/products/123`
+- `https://example.com/settings?tab=account`
+
+### Platform Requirements
+
+#### iOS (Universal Links)
+
+iOS Universal Links require hosting an `apple-app-site-association` file on your domain:
+
+**File location:**
+```
+https://example.com/.well-known/apple-app-site-association
+```
+
+**File content:**
+```json
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.com.example.app",
+        "paths": ["*"]
+      }
+    ]
+  }
+}
+```
+
+Replace:
+- `TEAM_ID` with your Apple Developer Team ID
+- `com.example.app` with your app's bundle identifier
+- `["*"]` with specific paths if you don't want all URLs to open the app
+
+**Requirements:**
+- File must be served over HTTPS
+- Content-Type must be `application/json`
+- No redirects allowed
+- File must be accessible without authentication
+
+#### Android (App Links)
+
+Android App Links require hosting a `assetlinks.json` file:
+
+**File location:**
+```
+https://example.com/.well-known/assetlinks.json
+```
+
+**File content:**
+```json
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.app",
+      "sha256_cert_fingerprints": [
+        "YOUR_CERTIFICATE_FINGERPRINT"
+      ]
+    }
+  }
+]
+```
+
+Replace:
+- `com.example.app` with your app's package name
+- `YOUR_CERTIFICATE_FINGERPRINT` with your app signing certificate's SHA-256 fingerprint
+
+**Getting your certificate fingerprint:**
+```bash
+keytool -list -v -keystore my-release-key.keystore
+```
+
+**Requirements:**
+- File must be served over HTTPS
+- Content-Type must be `application/json`
+- File must be accessible without authentication
+
+<Warning>
+HTTPS deep links only work when both the domain verification file is correctly configured AND the app is installed from the App Store/Play Store or signed with a release certificate.
+</Warning>
+
+## Handling Deep Links in Your App
+
+When a deep link opens your app, NativePHP dispatches it as a Laravel route.
+
+### Defining Deep Link Routes
+
+Handle deep links in your `routes/web.php` or `routes/native.php`:
+
+```php
+// routes/web.php
+
+use Illuminate\Support\Facades\Route;
+
+// Handle: myapp://home or https://example.com/home
+Route::get('/home', function () {
+    return view('home');
+});
+
+// Handle: myapp://products/123 or https://example.com/products/123
+Route::get('/products/{id}', function ($id) {
+    return view('product', ['id' => $id]);
+});
+
+// Handle: myapp://settings?tab=account
+Route::get('/settings', function (Request $request) {
+    $tab = $request->query('tab', 'general');
+    return view('settings', ['tab' => $tab]);
+});
+```
+
+### Detecting Deep Link Launches
+
+Check if your app was opened via a deep link:
+
+```php
+use Native\Mobile\Facades\App;
+
+// In a controller or Livewire component
+if (App::wasLaunchedFromDeepLink()) {
+    $url = App::getDeepLinkUrl();
+    // Handle the deep link
+}
+```
+
+### Livewire Deep Link Handling
+
+Handle deep links in Livewire components:
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class ProductPage extends Component
+{
+    public $productId;
+
+    public function mount($id)
+    {
+        $this->productId = $id;
+        // Load product details
+    }
+
+    #[On('deep-link-received')]
+    public function handleDeepLink($url)
+    {
+        // Parse URL and update component state
+        if (preg_match('/\/products\/(\d+)/', $url, $matches)) {
+            $this->productId = $matches[1];
+            // Reload product
+        }
+    }
+}
+```
+
+### Redirecting After Deep Link
+
+Redirect to a specific page when a deep link is received:
+
+```php
+// routes/web.php
+
+Route::get('/products/{id}', function ($id) {
+    // Redirect to the product page
+    return redirect()->route('product', ['id' => $id]);
+});
+```
+
+## NFC Tag Integration
+
+NFC tags can store URLs that open your app when tapped.
+
+### Writing URLs to NFC Tags
+
+Write an HTTPS deep link to an NFC tag:
+
+```php
+use Native\Mobile\Facades\NFC;
+
+// Write a URL to an NFC tag
+NFC::write('https://example.com/products/123');
+```
+
+When tapped, this URL will:
+1. Open your app if installed
+2. Open in browser if app is not installed
+
+### Reading NFC Tags
+
+Read URLs from NFC tags:
+
+```php
+use Native\Mobile\Facades\NFC;
+
+// Start scanning for NFC tags
+NFC::scan(function ($data) {
+    // $data contains the tag data
+    if (isset($data['url'])) {
+        // Handle the URL
+        $url = $data['url'];
+    }
+});
+```
+
+### NFC Deep Link Flow
+
+<Steps>
+  <Step title="User taps NFC tag">
+    Device reads the URL from the NFC tag (e.g., `https://example.com/products/123`)
+  </Step>
+  
+  <Step title="System checks for app association">
+    iOS/Android checks if your app is associated with `example.com`
+  </Step>
+  
+  <Step title="App opens (if installed)">
+    If your app is installed and properly configured, it opens with the URL
+  </Step>
+  
+  <Step title="Route handler processes the URL">
+    Your Laravel route handles the URL and displays the appropriate page
+  </Step>
+</Steps>
+
+### NFC Tag Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use HTTPS URLs for NFC tags">
+    HTTPS URLs work both when the app is installed and when it's not (falling back to browser).
+  </Accordion>
+  
+  <Accordion title="Keep URLs short">
+    NFC tags have limited storage. Use short, clean URLs.
+  </Accordion>
+  
+  <Accordion title="Test NFC tags on both platforms">
+    iOS and Android handle NFC differently. Test your tags on both platforms.
+  </Accordion>
+  
+  <Accordion title="Provide fallback content">
+    Ensure the URL works in a browser for users who don't have the app installed.
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Deep Link Patterns
+
+### Parameter Extraction
+
+Extract parameters from deep link URLs:
+
+```php
+// routes/web.php
+
+Route::get('/share/{type}/{id}', function ($type, $id) {
+    // Handle: myapp://share/product/123
+    // Handle: myapp://share/post/456
+    return view('share', ['type' => $type, 'id' => $id]);
+});
+```
+
+### Query Parameters
+
+Handle query parameters in deep links:
+
+```php
+Route::get('/search', function (Request $request) {
+    // Handle: myapp://search?q=laptop&category=electronics
+    $query = $request->query('q');
+    $category = $request->query('category');
+    
+    return view('search', [
+        'query' => $query,
+        'category' => $category,
+    ]);
+});
+```
+
+### Authentication Gates
+
+Protect deep link routes with authentication:
+
+```php
+Route::get('/account/orders/{id}', function ($id) {
+    // Handle: myapp://account/orders/123
+    // Redirects to login if not authenticated
+    return view('order', ['id' => $id]);
+})->middleware('auth');
+```
+
+### Dynamic Deep Link Generation
+
+Generate deep links programmatically:
+
+```php
+use Native\Mobile\Facades\DeepLink;
+
+// Generate a URL scheme deep link
+$deepLink = DeepLink::generate('/products/123');
+// Result: myapp://products/123
+
+// Generate an HTTPS deep link
+$httpsLink = DeepLink::generateHttps('/products/123');
+// Result: https://example.com/products/123
+```
+
+### Sharing Deep Links
+
+Share deep links via the native share sheet:
+
+```php
+use Native\Mobile\Facades\Share;
+
+// Share a deep link
+Share::text(
+    'Check out this product!',
+    'https://example.com/products/123'
+);
+```
+
+## Testing Deep Links
+
+### Testing in Development
+
+**iOS Simulator:**
+```bash
+# Test URL scheme
+xcrun simctl openurl booted myapp://home
+
+# Test HTTPS (won't open app in simulator without proper setup)
+xcrun simctl openurl booted https://example.com/home
+```
+
+**Android Emulator:**
+```bash
+# Test URL scheme
+adb shell am start -a android.intent.action.VIEW -d "myapp://home"
+
+# Test HTTPS
+adb shell am start -a android.intent.action.VIEW -d "https://example.com/home"
+```
+
+### Testing on Physical Devices
+
+1. Send yourself an email or message with the deep link
+2. Tap the link in the email/message
+3. Verify the app opens and handles the link correctly
+
+### Testing HTTPS Deep Links
+
+HTTPS deep links require:
+- App installed from App Store/Play Store (or signed with release certificate)
+- Domain verification files properly configured
+- Domain accessible over HTTPS
+
+**Verify iOS Universal Links:**
+```bash
+# Check if your domain is configured correctly
+curl https://example.com/.well-known/apple-app-site-association
+```
+
+**Verify Android App Links:**
+```bash
+# Check if your domain is configured correctly
+curl https://example.com/.well-known/assetlinks.json
+```
+
+## Troubleshooting
+
+### URL scheme deep links not working
+
+1. Verify `NATIVEPHP_DEEPLINK_SCHEME` is set in `.env`
+2. Run `php artisan native:install --force`
+3. Rebuild and reinstall the app
+4. Test with the correct URL format: `scheme://path`
+
+### HTTPS deep links not opening app
+
+1. Verify domain verification files are accessible:
+   - `https://example.com/.well-known/apple-app-site-association`
+   - `https://example.com/.well-known/assetlinks.json`
+2. Ensure files are served over HTTPS with no redirects
+3. Verify app is signed with release certificate or installed from store
+4. Check Team ID and bundle identifier (iOS) or package name and certificate fingerprint (Android)
+
+### NFC tags not working
+
+1. Ensure NFC is enabled on the device
+2. Verify the NFC tag contains a valid URL
+3. Test the URL in a browser first
+4. Check that NFC permissions are granted
+
+### Deep link routes not found
+
+1. Verify routes are defined in `routes/web.php`
+2. Check that route parameters match the URL structure
+3. Test the route directly in your app first
+4. Clear Laravel route cache: `php artisan route:clear`
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use both URL schemes and HTTPS">
+    Configure both for maximum compatibility. URL schemes work everywhere, HTTPS deep links provide a better user experience.
+  </Accordion>
+  
+  <Accordion title="Keep paths consistent">
+    Use the same URL structure for web, deep links, and NFC tags.
+  </Accordion>
+  
+  <Accordion title="Handle missing parameters gracefully">
+    Always validate and provide defaults for deep link parameters.
+  </Accordion>
+  
+  <Accordion title="Test on physical devices">
+    HTTPS deep links only work correctly on physical devices with proper signing.
+  </Accordion>
+  
+  <Accordion title="Provide fallback pages">
+    Ensure your HTTPS deep link URLs work in a browser for users without the app.
+  </Accordion>
+  
+  <Accordion title="Log deep link events">
+    Track which deep links are used to understand user behavior.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="NFC" icon="signal" href="/advanced/deeplinks">
+    Learn more about NFC tag reading and writing
+  </Card>
+  <Card title="Sharing" icon="share-nodes" href="/features/share">
+    Share deep links via the native share sheet
+  </Card>
+</CardGroup>

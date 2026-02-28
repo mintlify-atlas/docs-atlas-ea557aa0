@@ -1,0 +1,238 @@
+---
+title: Biometrics
+description: Authenticate users with fingerprint, Face ID, or other biometric methods available on their device.
+---
+
+The Biometrics API allows you to authenticate users using native biometric authentication methods such as fingerprint, Face ID, Touch ID, or other device-specific biometric sensors.
+
+## Usage
+
+Authenticate users with a simple prompt:
+
+```php
+use Native\Mobile\Facades\Biometrics;
+
+Biometrics::prompt();
+```
+
+The authentication result is returned asynchronously via the `Biometric\Completed` event.
+
+## Methods
+
+### `prompt()`
+
+Initiates a biometric authentication prompt on the device.
+
+**Returns:** `PendingBiometric` - A fluent interface for configuring the authentication request
+
+**Example:**
+```php
+Biometrics::prompt();
+```
+
+## Fluent API
+
+The `PendingBiometric` class provides a fluent interface for configuring biometric authentication:
+
+### `id(string $id)`
+
+Set a unique identifier for the authentication request to correlate with events.
+
+**Parameters:**
+- `$id` (string) - Unique identifier for this authentication request
+
+**Returns:** `PendingBiometric`
+
+**Example:**
+```php
+Biometrics::prompt()
+    ->id('login-attempt-123');
+```
+
+### `event(string $eventClass)`
+
+Dispatch a custom event class instead of the default `Biometric\Completed` event.
+
+**Parameters:**
+- `$eventClass` (string) - Fully qualified event class name
+
+**Returns:** `PendingBiometric`
+
+**Example:**
+```php
+Biometrics::prompt()
+    ->event(MyCustomBiometricEvent::class);
+```
+
+### `remember()`
+
+Store the authentication request ID in the session for later retrieval.
+
+**Returns:** `PendingBiometric`
+
+**Example:**
+```php
+Biometrics::prompt()
+    ->remember();
+
+// Later, retrieve the ID
+$id = PendingBiometric::lastId();
+```
+
+### `prompt()`
+
+Explicitly start the biometric authentication (called automatically if not invoked).
+
+**Returns:** `bool` - True if the prompt was initiated successfully
+
+**Example:**
+```php
+Biometrics::prompt()
+    ->id('my-auth')
+    ->prompt();
+```
+
+## Events
+
+### `Native\Mobile\Events\Biometric\Completed`
+
+Dispatched when biometric authentication completes.
+
+**Properties:**
+- `success` (bool) - Whether authentication was successful
+- `id` (string|null) - The unique identifier if one was set
+
+**Example:**
+```php
+use Native\Mobile\Events\Biometric\Completed;
+
+class MyListener
+{
+    public function handle(Completed $event)
+    {
+        if ($event->success) {
+            // User authenticated successfully
+            Auth::login($user);
+        } else {
+            // Authentication failed
+            Log::warning('Biometric authentication failed', [
+                'id' => $event->id
+            ]);
+        }
+    }
+}
+```
+
+## Examples
+
+### Basic Authentication
+
+```php
+use Native\Mobile\Facades\Biometrics;
+use Native\Mobile\Events\Biometric\Completed;
+
+// In your controller
+public function authenticateWithBiometrics()
+{
+    Biometrics::prompt();
+}
+
+// In your event listener
+class BiometricAuthListener
+{
+    public function handle(Completed $event)
+    {
+        if ($event->success) {
+            session(['biometric_verified' => true]);
+            return redirect()->route('dashboard');
+        }
+        
+        return back()->withErrors([
+            'biometric' => 'Authentication failed'
+        ]);
+    }
+}
+```
+
+### Tracking Multiple Authentication Requests
+
+```php
+use Native\Mobile\Facades\Biometrics;
+use Native\Mobile\Events\Biometric\Completed;
+
+// Store the ID for correlation
+$authId = Str::uuid();
+
+Biometrics::prompt()
+    ->id($authId)
+    ->remember();
+
+// In your listener
+class BiometricAuthListener
+{
+    public function handle(Completed $event)
+    {
+        $expectedId = PendingBiometric::lastId();
+        
+        if ($event->id === $expectedId && $event->success) {
+            // Correct authentication request succeeded
+            $this->completeSensitiveOperation();
+        }
+    }
+}
+```
+
+### Custom Event Handler
+
+```php
+use Native\Mobile\Facades\Biometrics;
+
+// Define custom event
+class PaymentAuthenticationCompleted
+{
+    public function __construct(
+        public bool $success,
+        public ?string $id = null
+    ) {}
+}
+
+// Trigger with custom event
+Biometrics::prompt()
+    ->id('payment-auth')
+    ->event(PaymentAuthenticationCompleted::class);
+
+// Listen for custom event
+class PaymentAuthListener
+{
+    public function handle(PaymentAuthenticationCompleted $event)
+    {
+        if ($event->success) {
+            $this->processPayment();
+        }
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+- Uses Face ID on devices with TrueDepth camera
+- Uses Touch ID on devices with fingerprint sensor
+- Requires `NSFaceIDUsageDescription` in Info.plist
+- System handles the biometric prompt UI automatically
+
+### Android
+
+- Uses BiometricPrompt API (Android 9+)
+- Supports fingerprint, face, and iris authentication
+- Falls back to device PIN/pattern if biometrics unavailable
+- Requires `USE_BIOMETRIC` permission in AndroidManifest.xml
+
+<Note>
+Biometric authentication requires that the user has enrolled biometric data on their device. If no biometrics are enrolled, the authentication will fail immediately.
+</Note>
+
+<Warning>
+Always implement a fallback authentication method (like password/PIN) for users who don't have biometric authentication enabled or for devices that don't support it.
+</Warning>

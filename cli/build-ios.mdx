@@ -1,0 +1,24 @@
+---
+title: native:build-ios
+description: iOS-specific build command
+---
+
+<Note>
+The `native:build-ios` command is an internal command used by `native:package` and `native:run`. Most users should use those commands instead.
+</Note>
+
+## Purpose
+
+This command handles iOS-specific build operations and is typically invoked by higher-level commands like `native:package` when building for iOS.
+
+## Common Use Cases
+
+For building iOS applications, use:
+
+- **Development builds**: `php artisan native:run ios`
+- **Production builds**: `php artisan native:package ios`
+
+## See also
+
+- [native:run](/cli/run) - Build and run your app
+- [native:package](/cli/package) - Package for distribution

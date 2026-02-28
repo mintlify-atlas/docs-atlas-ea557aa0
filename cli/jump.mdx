@@ -1,0 +1,370 @@
+---
+title: native:jump
+description: Start the NativePHP development server for testing mobile apps
+---
+
+Launches the NativePHP Jump Server, which allows you to test your Laravel application on mobile devices without installing native development tools.
+
+## Syntax
+
+```bash
+php artisan native:jump [platform] [options]
+```
+
+## Arguments
+
+### platform
+
+Target platform for asset building. Optional.
+
+- `android` or `a` - Build for Android
+- `ios` or `i` - Build for iOS
+
+If not specified, you'll be prompted to choose.
+
+## Options
+
+### --platform=PLATFORM
+
+Target platform (alternative to positional argument).
+
+```bash
+php artisan native:jump --platform=android
+```
+
+### --ios
+
+Target iOS platform (shorthand for `--platform=ios`).
+
+```bash
+php artisan native:jump --ios
+```
+
+### --android
+
+Target Android platform (shorthand for `--platform=android`).
+
+```bash
+php artisan native:jump --android
+```
+
+### --host=ADDRESS
+
+The host address to serve the application on. Default: `0.0.0.0`
+
+```bash
+php artisan native:jump --host=192.168.1.100
+```
+
+### --ip=ADDRESS
+
+The IP address to display in the QR code (overrides auto-detection).
+
+```bash
+php artisan native:jump --ip=192.168.1.100
+```
+
+Useful when you have multiple network interfaces and want to specify which one to use.
+
+### --http-port=PORT
+
+The HTTP port to serve on. Default: `3000`
+
+```bash
+php artisan native:jump --http-port=8080
+```
+
+If the port is in use, automatically finds the next available port.
+
+### --laravel-port=PORT
+
+The Laravel dev server port to proxy to. Default: `8000`
+
+```bash
+php artisan native:jump --laravel-port=8001
+```
+
+### --no-mdns
+
+Disable mDNS service advertisement.
+
+```bash
+php artisan native:jump --no-mdns
+```
+
+### --skip-build, -S
+
+Skip building the app bundle if `app.zip` already exists.
+
+```bash
+php artisan native:jump --skip-build
+```
+
+Useful for faster restarts during development.
+
+## Examples
+
+### Start Jump Server for Android
+
+```bash
+php artisan native:jump android
+```
+
+### Start with specific IP and port
+
+```bash
+php artisan native:jump --ios --ip=192.168.1.100 --http-port=3001
+```
+
+### Quick restart without rebuilding
+
+```bash
+php artisan native:jump --android --skip-build
+```
+
+### Use custom Laravel port
+
+```bash
+php artisan native:jump --laravel-port=8001
+```
+
+## What it does
+
+1. **Builds frontend assets**: Runs `npm run build -- --mode={platform}`
+2. **Creates app bundle**: Packages your Laravel app into `storage/app/native-build/app.zip`
+3. **Starts HTTP server**: Launches PHP built-in server on specified port
+4. **Opens browser with QR code**: Shows QR code to scan with mobile device
+5. **Serves app**: Mobile app downloads bundle and runs your Laravel application
+6. **Proxies API requests**: Forwards requests to your local Laravel server
+
+## How to use
+
+### 1. Start the Jump Server
+
+```bash
+php artisan native:jump android
+```
+
+### 2. Install NativePHP Jump app
+
+Download the Jump app on your mobile device:
+
+- **Android**: [Google Play Store](https://play.google.com/store/apps/details?id=com.nativephp.jump)
+- **iOS**: [Apple App Store](https://apps.apple.com/app/nativephp-jump/id123456789)
+
+### 3. Scan QR code
+
+1. Open NativePHP Jump app
+2. Tap "Scan QR Code"
+3. Scan the QR code displayed in your browser
+4. App downloads and launches your Laravel application
+
+### 4. Test your app
+
+Your Laravel app now runs on your mobile device! Changes require restarting the Jump server.
+
+## App bundle contents
+
+The `app.zip` bundle includes:
+
+- Application code (`app/`, `routes/`, `config/`)
+- Resources (`resources/views/`, `resources/js/`, `resources/css/`)
+- Public assets (`public/`)
+- Composer dependencies (`vendor/`)
+- Environment configuration (`.env` with sensitive values removed)
+- Bootstrap files
+
+**Excluded**:
+- `node_modules/`
+- `storage/` (except framework directories)
+- `tests/`
+- `.git/`
+- Native platform directories
+
+## Network requirements
+
+### Same network
+
+Your computer and mobile device must be on the **same local network** (Wi-Fi).
+
+### Firewall
+
+Ensure port 3000 (or custom port) is allowed:
+
+```bash
+# macOS
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /usr/bin/php
+
+# Linux (UFW)
+sudo ufw allow 3000
+
+# Windows Firewall
+# Add inbound rule for port 3000
+```
+
+### Multiple network interfaces
+
+If you have multiple network interfaces, specify which IP to use:
+
+```bash
+php artisan native:jump --ip=192.168.1.100
+```
+
+## Configuration
+
+### Server settings
+
+Configure in `config/nativephp.php`:
+
+```php
+'server' => [
+    'http_port' => env('NATIVEPHP_JUMP_PORT', 3000),
+    'open_browser' => env('NATIVEPHP_JUMP_OPEN_BROWSER', true),
+],
+```
+
+### Environment variables
+
+```env
+NATIVEPHP_JUMP_PORT=3000
+NATIVEPHP_JUMP_OPEN_BROWSER=true
+```
+
+### Build output location
+
+Bundles are created in:
+```
+storage/app/native-build/app.zip
+```
+
+## Common workflows
+
+### Development iteration
+
+```bash
+# Make code changes
+vim app/Http/Controllers/HomeController.php
+
+# Rebuild and restart
+php artisan native:jump --android
+
+# Scan QR code again in Jump app
+```
+
+### Testing on multiple devices
+
+1. Start Jump Server once
+2. Scan QR code on multiple devices
+3. All devices download the same bundle
+4. Test different screen sizes simultaneously
+
+### Working with Vite
+
+Jump Server runs `npm run build` automatically. Ensure your build script is configured:
+
+```json
+{
+  "scripts": {
+    "build": "vite build"
+  }
+}
+```
+
+## Troubleshooting
+
+### QR code doesn't load
+
+Check:
+1. Browser opened: Should auto-open at `http://localhost:3000/jump/qr`
+2. Manually open: `http://localhost:3000/jump/qr`
+3. Port in use: Try different port with `--http-port`
+
+### Mobile device can't connect
+
+Check:
+1. **Same network**: Both on same Wi-Fi
+2. **Firewall**: Allow port 3000
+3. **IP address**: Try `--ip` to specify correct network interface
+4. **Network isolation**: Some networks isolate devices (e.g., guest networks)
+
+### "npm run build" fails
+
+Check:
+1. Node.js installed: `node --version`
+2. Dependencies installed: `npm install`
+3. Build script exists in `package.json`
+4. No syntax errors in Vite config
+
+### Bundle creation fails
+
+Check:
+1. Write permissions: `chmod 755 storage/app`
+2. Disk space: `df -h`
+3. File exclusions: Review `.gitignore` patterns
+
+### App won't launch on device
+
+Check:
+1. **Bundle size**: Very large bundles (>100MB) may timeout
+2. **Internet**: Device needs internet for initial app download
+3. **App version**: Update NativePHP Jump app to latest version
+4. **PHP version**: App bundle requires PHP 8.2+
+
+### Changes not reflected
+
+Jump doesn't support hot reload. After changes:
+
+1. Stop server (Ctrl+C)
+2. Restart: `php artisan native:jump`
+3. Re-scan QR code in Jump app
+
+Or use `--skip-build` for faster restarts if only frontend changed.
+
+## Platform differences
+
+### Android
+
+Builds with:
+```bash
+npm run build -- --mode=android
+```
+
+### iOS
+
+Builds with:
+```bash
+npm run build -- --mode=ios
+```
+
+Ensure your Vite/build config handles these modes:
+
+```js
+// vite.config.js
+export default defineConfig(({ mode }) => ({
+  // Platform-specific config
+  define: {
+    __PLATFORM__: JSON.stringify(mode),
+  },
+}));
+```
+
+## Performance tips
+
+1. **Use --skip-build**: Skip bundling when only testing backend
+2. **Optimize bundle size**: Exclude unnecessary files
+3. **Fast network**: Use 5GHz Wi-Fi for faster downloads
+4. **Cache dependencies**: Vendor directory is cached between builds
+
+## Security notes
+
+- Jump Server is for **development only**
+- .env is sanitized (DB_, MAIL_, AWS_ credentials removed)
+- Only accessible on local network
+- Never expose to public internet
+- Use `native:package` for production builds
+
+## See also
+
+- [native:run](/cli/run) - Build and run natively
+- [native:watch](/cli/watch) - Hot reload for native apps
+- [Jump App Guide](/cli/jump) - Complete Jump setup guide

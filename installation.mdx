@@ -1,0 +1,367 @@
+---
+title: Installation
+description: Install NativePHP Mobile and configure your development environment
+---
+
+## Before you begin
+
+Make sure you have a Laravel application ready. NativePHP Mobile requires:
+
+- PHP 8.3 or higher
+- Laravel 10.x, 11.x, or 12.x
+- Composer installed
+
+<Note>
+  If you don't have a Laravel app yet, create one with: `composer create-project laravel/laravel my-mobile-app`
+</Note>
+
+## Installation steps
+
+<Steps>
+  <Step title="Install the package">
+    Install NativePHP Mobile via Composer:
+    
+    ```bash
+    composer require nativephp/mobile
+    ```
+    
+    This will add the package to your Laravel application and register the service provider automatically.
+  </Step>
+
+  <Step title="Run the install command">
+    Run the installation command to set up your mobile platforms:
+    
+    <CodeGroup>
+      ```bash macOS (iOS + Android)
+      php artisan native:install
+      ```
+      
+      ```bash macOS (iOS only)
+      php artisan native:install ios
+      ```
+      
+      ```bash Windows/Linux (Android only)
+      php artisan native:install android
+      ```
+    </CodeGroup>
+    
+    <Note>
+      iOS development is only available on macOS due to Xcode requirements.
+    </Note>
+    
+    ### What this command does
+    
+    The `native:install` command performs several important tasks:
+    
+    1. **Prompts for your app bundle ID** - Creates a unique identifier like `com.yourname.myapp`
+    2. **Publishes configuration files** - Adds `config/nativephp.php` to your project
+    3. **Creates the nativephp directory** - Sets up `nativephp/android` and/or `nativephp/ios` with native project files
+    4. **Downloads PHP binaries** - Embeds PHP runtime for your target platforms
+    5. **Copies CLI wrapper** - Installs the `native` binary for convenient commands
+    
+    <Warning>
+      The `nativephp` directory contains build artifacts and should not be committed to version control. It's automatically ignored via `.gitignore`.
+    </Warning>
+  </Step>
+
+  <Step title="Configure your app ID">
+    During installation, you'll be prompted to set your app bundle ID. This uniquely identifies your app on the App Store and Google Play.
+    
+    The installer generates a suggestion like `com.username.appname`, but you should customize it:
+    
+    ```bash
+    What should your app bundle ID be?
+    com.yourcompany.myapp
+    ```
+    
+    This sets `NATIVEPHP_APP_ID` in your `.env` file:
+    
+    ```bash .env
+    NATIVEPHP_APP_ID=com.yourcompany.myapp
+    ```
+    
+    <Note>
+      Bundle IDs use reverse domain notation and must be unique. Choose carefully as changing it later requires updating app store listings.
+    </Note>
+  </Step>
+
+  <Step title="Publish configuration (optional)">
+    The config file is published automatically, but you can republish it anytime:
+    
+    ```bash
+    php artisan vendor:publish --tag=nativephp-mobile-config
+    ```
+    
+    This creates `config/nativephp.php` where you can customize:
+    
+    - App version and version code
+    - Deep link schemes
+    - Start URL
+    - Development server ports
+    - Permissions
+    - Device orientation support
+    - Platform-specific settings
+  </Step>
+</Steps>
+
+## Platform-specific setup
+
+<Tabs>
+  <Tab title="iOS">
+    ### iOS development requirements
+    
+    iOS development requires macOS and Xcode:
+    
+    <Steps>
+      <Step title="Install Xcode">
+        Download and install [Xcode](https://developer.apple.com/xcode/) from the Mac App Store (free).
+        
+        After installation, open Xcode at least once to complete setup and accept the license agreement.
+      </Step>
+      
+      <Step title="Install command line tools">
+        ```bash
+        xcode-select --install
+        ```
+      </Step>
+      
+      <Step title="Set up iOS Simulator">
+        Open Xcode and go to **Xcode > Settings > Platforms** to download iOS Simulator runtimes for your target iOS versions.
+      </Step>
+      
+      <Step title="Configure development team (optional)">
+        For running on physical devices, you'll need an Apple Developer account:
+        
+        1. Sign up at [developer.apple.com](https://developer.apple.com)
+        2. Find your Team ID in **Membership** section
+        3. Add to your `.env`:
+        
+        ```bash .env
+        NATIVEPHP_DEVELOPMENT_TEAM=ABC123XYZ
+        ```
+        
+        <Note>
+          The free Apple Developer tier allows testing on your own devices. Paid membership ($99/year) is required for App Store distribution.
+        </Note>
+      </Step>
+    </Steps>
+  </Tab>
+  
+  <Tab title="Android">
+    ### Android development requirements
+    
+    Android development works on Windows, macOS, and Linux:
+    
+    <Steps>
+      <Step title="Install Android Studio">
+        Download and install [Android Studio](https://developer.android.com/studio) (includes Android SDK).
+        
+        During installation, make sure to install:
+        - Android SDK
+        - Android SDK Platform-Tools
+        - Android SDK Build-Tools
+        - Android Emulator
+      </Step>
+      
+      <Step title="Install Java Development Kit">
+        NativePHP requires JDK 17 or later:
+        
+        <CodeGroup>
+          ```bash macOS (Homebrew)
+          brew install openjdk@17
+          ```
+          
+          ```bash Ubuntu/Debian
+          sudo apt install openjdk-17-jdk
+          ```
+          
+          ```bash Windows
+          # Download from https://adoptium.net/
+          ```
+        </CodeGroup>
+      </Step>
+      
+      <Step title="Configure environment variables">
+        Set up Android SDK paths in your `.env`:
+        
+        <CodeGroup>
+          ```bash macOS/Linux
+          NATIVEPHP_ANDROID_SDK_LOCATION=$HOME/Library/Android/sdk
+          ANDROID_EMULATOR=$HOME/Library/Android/sdk/emulator/emulator
+          ```
+          
+          ```bash Windows
+          NATIVEPHP_ANDROID_SDK_LOCATION=C:\Users\YourName\AppData\Local\Android\Sdk
+          ANDROID_EMULATOR=C:\Users\YourName\AppData\Local\Android\Sdk\emulator\emulator.exe
+          ```
+        </CodeGroup>
+        
+        <Note>
+          NativePHP will attempt to auto-detect these paths if not specified.
+        </Note>
+      </Step>
+      
+      <Step title="Create an Android Virtual Device">
+        Open Android Studio and:
+        
+        1. Go to **Tools > Device Manager**
+        2. Click **Create Device**
+        3. Choose a phone (e.g., Pixel 5)
+        4. Download and select a system image (e.g., Android 13)
+        5. Name your AVD and click **Finish**
+        
+        Or use the command line:
+        
+        ```bash
+        php artisan native:emulator --launch
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Install command options
+
+The `native:install` command supports several options:
+
+```bash
+php artisan native:install [platform] [options]
+```
+
+### Arguments
+
+- `platform` - Specify `android`, `ios`, or `both` (interactive prompt if omitted)
+
+### Options
+
+- `--force` or `-F` - Overwrite existing native project files
+- `--with-icu` - Include ICU support for Android (adds ~30MB, enables internationalization)
+- `--without-icu` - Exclude ICU support (default, smaller app size)
+- `--skip-php` - Skip downloading PHP binaries (for offline development)
+
+### Examples
+
+```bash
+# Install both platforms, overwriting existing files
+php artisan native:install both --force
+
+# Install Android with ICU support for internationalization
+php artisan native:install android --with-icu
+
+# Install iOS without downloading PHP again
+php artisan native:install ios --skip-php
+```
+
+## Verify installation
+
+Check that everything is installed correctly:
+
+```bash
+php artisan native:version
+```
+
+This displays the NativePHP Mobile version and confirms the package is working.
+
+## Configuration file overview
+
+The `config/nativephp.php` file contains all mobile app settings:
+
+```php
+return [
+    // App version displayed to users (e.g., "1.0.0")
+    'version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+    
+    // Internal version code (must increment with each release)
+    'version_code' => env('NATIVEPHP_APP_VERSION_CODE', 1),
+    
+    // Unique app identifier
+    'app_id' => env('NATIVEPHP_APP_ID'),
+    
+    // URL to open when app launches
+    'start_url' => env('NATIVEPHP_START_URL', '/'),
+    
+    // Deep linking configuration
+    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME'),
+    'deeplink_host' => env('NATIVEPHP_DEEPLINK_HOST'),
+    
+    // Platform-specific settings
+    'android' => [
+        'status_bar_style' => 'auto', // 'auto', 'light', or 'dark'
+    ],
+    
+    // Device permissions
+    'permissions' => [
+        // 'camera' => 'We need camera access to scan QR codes',
+        // 'location' => true,
+    ],
+    
+    // iPad support (iOS only)
+    'ipad' => false,
+    
+    // Orientation support
+    'orientation' => [
+        'iphone' => [
+            'portrait' => true,
+            'landscape_left' => false,
+            'landscape_right' => false,
+        ],
+        'android' => [
+            'portrait' => true,
+            'landscape_left' => false,
+            'landscape_right' => false,
+        ],
+    ],
+];
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="WSL not supported for Android">
+    NativePHP Mobile does not support Android development in WSL (Windows Subsystem for Linux).
+    
+    **Solution**: Run commands from Windows CMD or PowerShell instead of WSL.
+  </Accordion>
+  
+  <Accordion title="iOS requires macOS">
+    iOS development requires macOS hardware due to Xcode and Apple's licensing restrictions.
+    
+    **Solution**: Use a Mac or Mac mini for iOS development, or focus on Android only.
+  </Accordion>
+  
+  <Accordion title="PHP binary download fails">
+    If PHP binary downloads fail due to network issues:
+    
+    **Solution**: Retry the install command. For persistent issues, check your internet connection and firewall settings.
+  </Accordion>
+  
+  <Accordion title="Gradle build errors (Android)">
+    Gradle may fail if JDK is not configured correctly.
+    
+    **Solution**: Ensure JDK 17+ is installed and set `JAVA_HOME` environment variable:
+    
+    ```bash
+    export JAVA_HOME=/path/to/jdk-17
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart tutorial" icon="rocket" href="/quickstart">
+    Build your first mobile app in under 5 minutes
+  </Card>
+  
+  <Card title="CLI commands" icon="terminal" href="/cli/install">
+    Learn about the available NativePHP commands
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Explore all configuration options
+  </Card>
+  
+  <Card title="Native features" icon="sparkles" href="/features/camera">
+    Start using device features in your app
+  </Card>
+</CardGroup>

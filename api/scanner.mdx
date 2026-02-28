@@ -1,0 +1,457 @@
+---
+title: Scanner
+description: Scan QR codes and barcodes using the device camera
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Scanner;
+```
+
+## Methods
+
+### scan()
+
+Create a new QR code/barcode scanner instance.
+
+```php
+use Native\Mobile\Facades\Scanner;
+
+$scanner = Scanner::scan();
+```
+
+<ResponseField name="return" type="PendingScanner">
+  A pending scanner instance for fluent configuration
+</ResponseField>
+
+### make()
+
+Alias for `scan()` to match other NativePHP patterns.
+
+```php
+use Native\Mobile\Facades\Scanner;
+
+$scanner = Scanner::make();
+```
+
+<ResponseField name="return" type="PendingScanner">
+  A pending scanner instance for fluent configuration
+</ResponseField>
+
+## PendingScanner Methods
+
+### prompt()
+
+Set the prompt text shown on the scanner screen.
+
+<ParamField path="prompt" type="string" required>
+  Text to display on the scanner interface
+</ParamField>
+
+```php
+Scanner::scan()
+    ->prompt('Scan the QR code on your ticket');
+```
+
+### continuous()
+
+Enable continuous scanning mode (scan multiple codes without closing).
+
+<ParamField path="continuous" type="bool" default="true">
+  Enable continuous mode
+</ParamField>
+
+```php
+Scanner::scan()
+    ->continuous(); // Scan multiple codes
+
+Scanner::scan()
+    ->continuous(false); // Scan once and close
+```
+
+### formats()
+
+Set which barcode formats to scan.
+
+<ParamField path="formats" type="array" required>
+  Array of format strings
+</ParamField>
+
+```php
+Scanner::scan()
+    ->formats(['qr', 'ean13', 'code128']);
+```
+
+**Supported formats:**
+- `'qr'` - QR codes
+- `'ean13'` - EAN-13 barcodes
+- `'ean8'` - EAN-8 barcodes
+- `'code128'` - Code 128 barcodes
+- `'code39'` - Code 39 barcodes
+- `'upca'` - UPC-A barcodes
+- `'upce'` - UPC-E barcodes
+- `'all'` - All supported formats
+
+### id()
+
+Set a unique identifier for this scan session.
+
+<ParamField path="id" type="string" required>
+  Unique identifier
+</ParamField>
+
+```php
+Scanner::scan()
+    ->id('ticket-scan-123');
+```
+
+### getId()
+
+Get the scan session ID.
+
+```php
+$pending = Scanner::scan();
+$id = $pending->getId();
+```
+
+### scan()
+
+Explicitly start the scanner (automatically called if not invoked).
+
+```php
+Scanner::scan()
+    ->prompt('Scan barcode')
+    ->formats(['ean13'])
+    ->scan();
+```
+
+## Events
+
+### CodeScanned
+
+Dispatched when a QR code or barcode is successfully scanned.
+
+```php
+use Native\Mobile\Events\Scanner\CodeScanned;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(CodeScanned::class, function (CodeScanned $event) {
+    $data = $event->data;     // Scanned content
+    $format = $event->format; // Format type (qr, ean13, etc.)
+    $id = $event->id;         // Tracking ID if set
+});
+```
+
+**Event Properties:**
+- `data` (string) - The scanned code content
+- `format` (string) - The barcode format type
+- `id` (string|null) - Tracking ID if set
+
+### ScannerCancelled
+
+Dispatched when the scanner is closed without scanning or when permission is denied.
+
+**Event Properties:**
+- `cancelled` (bool) - Always true
+- `reason` (string|null) - Cancellation reason
+- `id` (string|null) - Tracking ID if set
+
+## Examples
+
+### Simple QR Code Scanner
+
+```php
+use Native\Mobile\Facades\Scanner;
+use Native\Mobile\Events\Scanner\CodeScanned;
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class QRScanner extends Component
+{
+    public $scannedData = null;
+    
+    public function openScanner()
+    {
+        Scanner::scan()
+            ->prompt('Scan QR Code')
+            ->id('qr-scan');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleScan($data)
+    {
+        $this->scannedData = $data['data'];
+        
+        // Process the scanned data
+        $this->processQRCode($data['data']);
+    }
+    
+    private function processQRCode(string $content)
+    {
+        // Handle the QR code content
+        if (filter_var($content, FILTER_VALIDATE_URL)) {
+            Browser::inApp($content);
+        } else {
+            Dialog::alert('Scanned', $content, ['OK']);
+        }
+    }
+}
+```
+
+### Barcode Product Scanner
+
+```php
+use Native\Mobile\Facades\Scanner;
+use Native\Mobile\Events\Scanner\CodeScanned;
+use Livewire\Attributes\On;
+
+class ProductScanner extends Component
+{
+    public $products = [];
+    
+    public function scanProduct()
+    {
+        Scanner::scan()
+            ->prompt('Scan product barcode')
+            ->formats(['ean13', 'ean8', 'upca', 'upce'])
+            ->continuous() // Scan multiple products
+            ->id('product-scanner');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleBarcode($data)
+    {
+        $barcode = $data['data'];
+        
+        // Look up product
+        $product = Product::where('barcode', $barcode)->first();
+        
+        if ($product) {
+            $this->products[] = $product;
+            Device::vibrate(); // Haptic feedback
+            Dialog::toast('Product added: ' . $product->name);
+        } else {
+            Dialog::toast('Product not found');
+        }
+    }
+}
+```
+
+### Ticket Validation System
+
+```php
+use Native\Mobile\Facades\Scanner;
+use Native\Mobile\Events\Scanner\CodeScanned;
+
+class TicketValidator extends Component
+{
+    public $validatedTickets = [];
+    
+    public function startValidation()
+    {
+        Scanner::scan()
+            ->prompt('Scan ticket QR code')
+            ->formats(['qr'])
+            ->continuous()
+            ->id('ticket-validation');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function validateTicket($data)
+    {
+        $ticketCode = $data['data'];
+        
+        $ticket = Ticket::where('code', $ticketCode)->first();
+        
+        if (!$ticket) {
+            Dialog::alert('Invalid', 'Ticket not found', ['OK']);
+            return;
+        }
+        
+        if ($ticket->validated_at) {
+            Dialog::alert(
+                'Already Used',
+                'This ticket was already validated at ' . $ticket->validated_at->format('H:i'),
+                ['OK']
+            );
+            return;
+        }
+        
+        // Mark as validated
+        $ticket->update([
+            'validated_at' => now(),
+            'validated_by' => auth()->id(),
+        ]);
+        
+        $this->validatedTickets[] = $ticket;
+        
+        Device::vibrate();
+        Dialog::toast('Ticket validated');
+    }
+}
+```
+
+### Inventory Scanner
+
+```php
+use Native\Mobile\Facades\Scanner;
+
+class InventoryCounter extends Component
+{
+    public $counts = [];
+    
+    public function startCounting()
+    {
+        Scanner::scan()
+            ->prompt('Scan items to count')
+            ->formats(['all'])
+            ->continuous()
+            ->id('inventory-count');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function countItem($data)
+    {
+        $barcode = $data['data'];
+        
+        if (!isset($this->counts[$barcode])) {
+            $this->counts[$barcode] = 0;
+        }
+        
+        $this->counts[$barcode]++;
+        Device::vibrate();
+    }
+    
+    public function finishCounting()
+    {
+        foreach ($this->counts as $barcode => $count) {
+            InventoryCount::create([
+                'barcode' => $barcode,
+                'count' => $count,
+                'counted_by' => auth()->id(),
+                'counted_at' => now(),
+            ]);
+        }
+        
+        Dialog::toast('Inventory saved');
+        $this->counts = [];
+    }
+}
+```
+
+### Authentication via QR Code
+
+```php
+use Native\Mobile\Facades\Scanner;
+
+class QRLogin extends Component
+{
+    public function scanLoginCode()
+    {
+        Scanner::scan()
+            ->prompt('Scan the QR code to log in')
+            ->formats(['qr'])
+            ->id('qr-login');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleLoginScan($data)
+    {
+        $loginToken = $data['data'];
+        
+        // Verify the token
+        $response = Http::post('https://api.example.com/auth/qr-verify', [
+            'token' => $loginToken,
+            'device_id' => Device::getId(),
+        ]);
+        
+        if ($response->successful()) {
+            $userData = $response->json();
+            
+            // Log in the user
+            auth()->loginUsingId($userData['user_id']);
+            
+            Dialog::toast('Logged in successfully');
+            return redirect()->route('dashboard');
+        }
+        
+        Dialog::alert('Login Failed', 'Invalid or expired QR code', ['OK']);
+    }
+}
+```
+
+### Multi-Format Scanner
+
+```php
+use Native\Mobile\Facades\Scanner;
+
+class UniversalScanner extends Component
+{
+    public function scan()
+    {
+        Scanner::scan()
+            ->prompt('Scan any barcode or QR code')
+            ->formats(['all'])
+            ->id('universal-scan');
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleScan($data)
+    {
+        $content = $data['data'];
+        $format = $data['format'];
+        
+        match($format) {
+            'qr' => $this->handleQRCode($content),
+            'ean13', 'ean8', 'upca', 'upce' => $this->handleProductBarcode($content),
+            'code128', 'code39' => $this->handleShippingCode($content),
+            default => $this->handleUnknown($content, $format),
+        };
+    }
+    
+    private function handleQRCode(string $content)
+    {
+        if (filter_var($content, FILTER_VALIDATE_URL)) {
+            Browser::inApp($content);
+        }
+    }
+    
+    private function handleProductBarcode(string $barcode)
+    {
+        // Look up product
+        $product = Product::where('barcode', $barcode)->first();
+        // ...
+    }
+}
+```
+
+### Scanner with Permission Handling
+
+```php
+use Native\Mobile\Facades\Scanner;
+use Native\Mobile\Events\Scanner\ScannerCancelled;
+
+class PermissionAwareScanner extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\Scanner\\ScannerCancelled')]
+    public function handleCancelled($data)
+    {
+        if ($data['reason'] === 'permission_denied') {
+            Dialog::alert(
+                'Camera Permission Required',
+                'Please enable camera access in Settings to scan codes.',
+                ['Open Settings', 'Cancel']
+            )->id('camera-permission');
+        }
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Alert\\ButtonPressed')]
+    public function handleButtonPress($data)
+    {
+        if ($data['id'] === 'camera-permission' && $data['index'] === 0) {
+            System::appSettings();
+        }
+    }
+}
+```

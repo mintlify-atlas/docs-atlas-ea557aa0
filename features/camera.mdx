@@ -1,0 +1,391 @@
+---
+title: Camera
+description: Capture photos, record videos, and pick media from the device gallery.
+---
+
+The Camera API provides methods to capture photos, record videos using the device camera, and select media from the device's photo gallery.
+
+## Usage
+
+Capture a photo:
+
+```php
+use Native\Mobile\Facades\Camera;
+
+Camera::getPhoto();
+```
+
+All camera operations return results asynchronously via events.
+
+## Methods
+
+### `getPhoto(array $options = [])`
+
+Opens the native camera app for photo capture.
+
+**Parameters:**
+- `$options` (array) - Optional capture configuration
+
+**Returns:** `PendingPhotoCapture` - Fluent interface for configuring the capture
+
+**Events:**
+- `Camera\PhotoTaken` - Dispatched when photo is captured
+- `Camera\PhotoCancelled` - Dispatched when user cancels
+
+**Example:**
+```php
+Camera::getPhoto();
+```
+
+### `pickImages(string $media_type = 'all', bool $multiple = false, int $max_items = 10)`
+
+Opens the native gallery picker for selecting photos and/or videos.
+
+**Parameters:**
+- `$media_type` (string) - Type of media: `'image'`, `'video'`, or `'all'` (default: `'all'`)
+- `$multiple` (bool) - Allow multiple selection (default: `false`)
+- `$max_items` (int) - Maximum items when multiple=true (default: `10`)
+
+**Returns:** `PendingMediaPicker` - Fluent interface for configuring the picker
+
+**Events:**
+- `Gallery\MediaSelected` - Dispatched when media is selected
+
+**Example:**
+```php
+Camera::pickImages('image', true, 5);
+```
+
+### `recordVideo(array $options = [])`
+
+Opens the native camera app for video recording.
+
+**Parameters:**
+- `$options` (array) - Optional recording configuration
+  - `maxDuration` (int) - Maximum recording duration in seconds
+
+**Returns:** `PendingVideoRecorder` - Fluent interface for configuring the recorder
+
+**Events:**
+- `Camera\VideoRecorded` - Dispatched when video is recorded
+- `Camera\VideoCancelled` - Dispatched when user cancels
+
+**Example:**
+```php
+Camera::recordVideo(['maxDuration' => 30]);
+```
+
+## Photo Capture API
+
+The `PendingPhotoCapture` class provides a fluent interface:
+
+### `id(string $id)`
+
+Set a unique identifier for the capture request.
+
+**Example:**
+```php
+Camera::getPhoto()
+    ->id('profile-photo');
+```
+
+### `event(string $eventClass)`
+
+Dispatch a custom event instead of the default `PhotoTaken` event.
+
+**Example:**
+```php
+Camera::getPhoto()
+    ->event(MyCustomPhotoEvent::class);
+```
+
+### `remember()`
+
+Store the capture ID in the session for later retrieval.
+
+**Example:**
+```php
+Camera::getPhoto()
+    ->remember();
+
+// Later
+$id = PendingPhotoCapture::lastId();
+```
+
+### `start()`
+
+Explicitly start the photo capture (called automatically if not invoked).
+
+**Example:**
+```php
+Camera::getPhoto()
+    ->id('my-photo')
+    ->start();
+```
+
+## Media Picker API
+
+The `PendingMediaPicker` class provides a fluent interface:
+
+### `mediaType(string $type)`
+
+Set the type of media to select: `'image'`, `'video'`, or `'all'`.
+
+**Example:**
+```php
+Camera::pickImages()
+    ->mediaType('image');
+```
+
+### `images()`
+
+Only allow image selection.
+
+**Example:**
+```php
+Camera::pickImages()
+    ->images();
+```
+
+### `videos()`
+
+Only allow video selection.
+
+**Example:**
+```php
+Camera::pickImages()
+    ->videos();
+```
+
+### `all()`
+
+Allow both images and videos (default).
+
+**Example:**
+```php
+Camera::pickImages()
+    ->all();
+```
+
+### `multiple(bool $multiple = true, int $maxItems = 10)`
+
+Allow multiple media selection.
+
+**Example:**
+```php
+Camera::pickImages()
+    ->images()
+    ->multiple(true, 5);
+```
+
+### `single()`
+
+Only allow single media selection (default).
+
+**Example:**
+```php
+Camera::pickImages()
+    ->single();
+```
+
+## Video Recorder API
+
+The `PendingVideoRecorder` class provides a fluent interface:
+
+### `maxDuration(int $seconds)`
+
+Set the maximum recording duration in seconds.
+
+**Example:**
+```php
+Camera::recordVideo()
+    ->maxDuration(60);
+```
+
+### `id(string $id)`
+
+Set a unique identifier for the recording request.
+
+**Example:**
+```php
+Camera::recordVideo()
+    ->id('story-video');
+```
+
+## Events
+
+### `Native\Mobile\Events\Camera\PhotoTaken`
+
+**Properties:**
+- `path` (string) - File path to the captured photo
+- `mimeType` (string) - MIME type (e.g., 'image/jpeg')
+- `id` (string|null) - The unique identifier if one was set
+
+### `Native\Mobile\Events\Gallery\MediaSelected`
+
+Dispatched when media is selected from the gallery. Contains information about selected files.
+
+### `Native\Mobile\Events\Camera\VideoRecorded`
+
+**Properties:**
+- `path` (string) - File path to the recorded video
+- `mimeType` (string) - MIME type (e.g., 'video/mp4')
+- `id` (string|null) - The unique identifier if one was set
+
+## Examples
+
+### Profile Photo Upload
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+class ProfileController extends Controller
+{
+    public function updatePhoto()
+    {
+        Camera::getPhoto()
+            ->id('profile-photo')
+            ->remember();
+    }
+}
+
+class PhotoTakenListener
+{
+    public function handle(PhotoTaken $event)
+    {
+        if ($event->id === PendingPhotoCapture::lastId()) {
+            $user = auth()->user();
+            
+            // Upload to cloud storage
+            $url = Storage::putFile('profiles', $event->path);
+            
+            $user->update(['avatar' => $url]);
+        }
+    }
+}
+```
+
+### Multiple Image Gallery Selection
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Gallery\MediaSelected;
+
+public function addPhotosToAlbum()
+{
+    Camera::pickImages()
+        ->images()
+        ->multiple(true, 10)
+        ->id('album-photos');
+}
+
+class MediaSelectedListener
+{
+    public function handle(MediaSelected $event)
+    {
+        foreach ($event->files as $file) {
+            // Process each selected image
+            $album->addPhoto($file['path']);
+        }
+    }
+}
+```
+
+### Video Story Recording
+
+```php
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Events\Camera\VideoRecorded;
+use Native\Mobile\Events\Camera\VideoCancelled;
+
+public function recordStory()
+{
+    Camera::recordVideo()
+        ->maxDuration(30)
+        ->id('user-story')
+        ->remember();
+}
+
+class VideoRecordedListener
+{
+    public function handle(VideoRecorded $event)
+    {
+        if ($event->id === PendingVideoRecorder::lastId()) {
+            // Process the recorded video
+            Story::create([
+                'user_id' => auth()->id(),
+                'video_path' => $event->path,
+                'mime_type' => $event->mimeType,
+            ]);
+        }
+    }
+}
+
+class VideoCancelledListener
+{
+    public function handle(VideoCancelled $event)
+    {
+        Log::info('User cancelled video recording');
+    }
+}
+```
+
+### Photo or Video Selection
+
+```php
+use Native\Mobile\Facades\Camera;
+
+public function addMediaToPost()
+{
+    Camera::pickImages()
+        ->all() // Allow both images and videos
+        ->single()
+        ->id('post-media');
+}
+```
+
+### Custom Event Handler
+
+```php
+use Native\Mobile\Facades\Camera;
+
+class ProductPhotoUploaded
+{
+    public function __construct(
+        public string $path,
+        public string $mimeType,
+        public ?string $id = null
+    ) {}
+}
+
+Camera::getPhoto()
+    ->event(ProductPhotoUploaded::class)
+    ->id('product-123');
+```
+
+## Platform Notes
+
+### iOS
+
+- Uses `UIImagePickerController` for camera and gallery access
+- Requires `NSCameraUsageDescription` in Info.plist for camera access
+- Requires `NSPhotoLibraryUsageDescription` for gallery access
+- Photos are saved to app's temporary directory
+- Quality and camera selection controlled by native camera app
+
+### Android
+
+- Uses `ACTION_IMAGE_CAPTURE` and `ACTION_VIDEO_CAPTURE` intents
+- Requires `CAMERA` permission in AndroidManifest.xml
+- Requires `READ_EXTERNAL_STORAGE` permission for gallery access
+- Photos stored in app's cache directory
+- Native camera app handles all recording settings
+
+<Note>
+All captured media is stored in temporary directories. Make sure to move or upload files to permanent storage in your event handlers before they are automatically cleaned up.
+</Note>
+
+<Warning>
+Camera and gallery access requires appropriate permissions. Make sure permissions are requested before attempting to use these features. Users can deny permission, so always handle the `PermissionDenied` event.
+</Warning>

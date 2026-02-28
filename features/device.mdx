@@ -1,0 +1,362 @@
+---
+title: Device
+description: Access device information, control hardware features, and interact with device sensors.
+---
+
+The Device API provides methods to retrieve device information, control hardware features like the flashlight, and trigger haptic feedback.
+
+## Usage
+
+Get basic device information:
+
+```php
+use Native\Mobile\Facades\Device;
+
+$deviceId = Device::getId();
+```
+
+## Methods
+
+### `getId()`
+
+Retrieve the unique device identifier.
+
+**Returns:** `string|null` - The unique device ID, or null if unavailable
+
+**Example:**
+```php
+$deviceId = Device::getId();
+```
+
+<Note>
+The device ID is a unique, persistent identifier specific to the app installation. It may reset if the app is uninstalled and reinstalled.
+</Note>
+
+### `getInfo()`
+
+Retrieve detailed device information.
+
+**Returns:** `string|null` - JSON string containing device information, or null if unavailable
+
+**Example:**
+```php
+$info = Device::getInfo();
+$data = json_decode($info, true);
+
+// Typical data includes:
+// - model: Device model name
+// - manufacturer: Device manufacturer
+// - platform: 'iOS' or 'Android'
+// - osVersion: Operating system version
+// - appVersion: Your app version
+```
+
+### `getBatteryInfo()`
+
+Retrieve current battery information.
+
+**Returns:** `string|null` - JSON string containing battery information, or null if unavailable
+
+**Example:**
+```php
+$batteryInfo = Device::getBatteryInfo();
+$battery = json_decode($batteryInfo, true);
+
+// Typical data includes:
+// - level: Battery percentage (0-100)
+// - isCharging: Whether device is currently charging
+// - chargingType: 'usb', 'ac', 'wireless', or 'unknown'
+```
+
+### `vibrate()`
+
+Trigger a short haptic vibration.
+
+**Returns:** `bool` - True if vibration was triggered successfully
+
+**Example:**
+```php
+Device::vibrate();
+```
+
+<Note>
+This method triggers a generic vibration. The exact vibration pattern depends on the device. For more control over haptic feedback patterns, this is a simple on/off vibration.
+</Note>
+
+### `flashlight()`
+
+Toggle the device flashlight on or off.
+
+**Returns:** `array` - Array with 'success' (bool) and 'state' (bool)
+- `success`: Whether the operation succeeded
+- `state`: Current flashlight state (true = on, false = off)
+
+**Example:**
+```php
+$result = Device::flashlight();
+
+if ($result['success']) {
+    $isOn = $result['state'];
+    echo $isOn ? 'Flashlight is ON' : 'Flashlight is OFF';
+}
+```
+
+## Examples
+
+### Device Registration
+
+```php
+use Native\Mobile\Facades\Device;
+use Illuminate\Support\Facades\Auth;
+
+public function registerDevice()
+{
+    $user = Auth::user();
+    $deviceId = Device::getId();
+    $info = json_decode(Device::getInfo(), true);
+    
+    $user->devices()->updateOrCreate(
+        ['device_id' => $deviceId],
+        [
+            'platform' => $info['platform'],
+            'model' => $info['model'],
+            'os_version' => $info['osVersion'],
+            'app_version' => $info['appVersion'],
+            'last_seen' => now(),
+        ]
+    );
+}
+```
+
+### Battery Status Monitoring
+
+```php
+use Native\Mobile\Facades\Device;
+
+public function checkBatteryStatus()
+{
+    $batteryInfo = Device::getBatteryInfo();
+    
+    if (!$batteryInfo) {
+        return null;
+    }
+    
+    $battery = json_decode($batteryInfo, true);
+    
+    if ($battery['level'] < 20 && !$battery['isCharging']) {
+        // Warn user about low battery
+        return response()->json([
+            'warning' => 'Low battery detected',
+            'level' => $battery['level'],
+            'message' => 'Consider charging your device'
+        ]);
+    }
+    
+    return response()->json($battery);
+}
+```
+
+### Flashlight Toggle Button
+
+```php
+use Native\Mobile\Facades\Device;
+
+class FlashlightController extends Controller
+{
+    public function toggle()
+    {
+        $result = Device::flashlight();
+        
+        if (!$result['success']) {
+            return response()->json([
+                'error' => 'Failed to toggle flashlight'
+            ], 500);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'state' => $result['state'] ? 'on' : 'off',
+            'message' => $result['state'] ? 
+                'Flashlight turned on' : 
+                'Flashlight turned off'
+        ]);
+    }
+}
+```
+
+### Haptic Feedback on Actions
+
+```php
+use Native\Mobile\Facades\Device;
+
+public function submitForm(Request $request)
+{
+    $validated = $request->validate([...]);
+    
+    // Process form...
+    $success = $this->processForm($validated);
+    
+    if ($success) {
+        // Provide haptic feedback on success
+        Device::vibrate();
+        
+        return response()->json([
+            'message' => 'Form submitted successfully'
+        ]);
+    }
+    
+    return response()->json([
+        'error' => 'Form submission failed'
+    ], 422);
+}
+```
+
+### Multi-Device User Management
+
+```php
+use Native\Mobile\Facades\Device;
+use Illuminate\Support\Facades\Auth;
+
+class DeviceController extends Controller
+{
+    public function listUserDevices()
+    {
+        $user = Auth::user();
+        $currentDeviceId = Device::getId();
+        
+        $devices = $user->devices->map(function ($device) use ($currentDeviceId) {
+            return [
+                'id' => $device->id,
+                'device_id' => $device->device_id,
+                'platform' => $device->platform,
+                'model' => $device->model,
+                'is_current' => $device->device_id === $currentDeviceId,
+                'last_seen' => $device->last_seen->diffForHumans(),
+            ];
+        });
+        
+        return response()->json($devices);
+    }
+    
+    public function removeDevice(string $deviceId)
+    {
+        $user = Auth::user();
+        $currentDeviceId = Device::getId();
+        
+        if ($deviceId === $currentDeviceId) {
+            return response()->json([
+                'error' => 'Cannot remove current device'
+            ], 422);
+        }
+        
+        $user->devices()->where('device_id', $deviceId)->delete();
+        
+        return response()->json([
+            'message' => 'Device removed successfully'
+        ]);
+    }
+}
+```
+
+### Device Information Debug View
+
+```php
+use Native\Mobile\Facades\Device;
+
+public function deviceDebug()
+{
+    return response()->json([
+        'device_id' => Device::getId(),
+        'info' => json_decode(Device::getInfo(), true),
+        'battery' => json_decode(Device::getBatteryInfo(), true),
+    ]);
+}
+```
+
+### Low Battery Energy Saving
+
+```php
+use Native\Mobile\Facades\Device;
+
+class EnergyManager
+{
+    public function shouldEnableEnergySaving(): bool
+    {
+        $batteryInfo = Device::getBatteryInfo();
+        
+        if (!$batteryInfo) {
+            return false;
+        }
+        
+        $battery = json_decode($batteryInfo, true);
+        
+        // Enable energy saving if battery < 15% and not charging
+        return $battery['level'] < 15 && !$battery['isCharging'];
+    }
+    
+    public function applyEnergySaving()
+    {
+        if ($this->shouldEnableEnergySaving()) {
+            // Reduce background sync frequency
+            // Disable animations
+            // Lower quality settings
+            Cache::put('energy_saving_mode', true, now()->addHours(1));
+        }
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+#### Device ID
+- Uses `identifierForVendor` (IDFV)
+- Unique per app developer
+- Persists across app updates
+- Resets on app uninstall
+
+#### Device Info
+- Provides model (e.g., "iPhone 14 Pro")
+- iOS version
+- Device name set by user
+
+#### Battery
+- Requires enabling battery monitoring
+- Charging state detection
+- Wireless charging detected as 'wireless'
+
+#### Flashlight
+- Uses AVCaptureDevice torch
+- Not available on devices without flash (e.g., iPads)
+- Automatically turns off when camera is used
+
+### Android
+
+#### Device ID
+- Uses a generated UUID stored in SharedPreferences
+- Persists across app restarts
+- Resets on app data clear or uninstall
+
+#### Device Info
+- Provides manufacturer and model
+- Android version
+- Device brand
+
+#### Battery
+- Uses BatteryManager
+- Charging type: USB, AC, or wireless
+- Percentage accuracy depends on device
+
+#### Flashlight
+- Uses Camera2 API
+- Not available on devices without flash
+- Requires camera permission
+
+<Warning>
+The flashlight may not be available on all devices (tablets, some budget phones). Always check the `success` property in the returned array before assuming the flashlight state changed.
+</Warning>
+
+<Note>
+Device information methods return JSON strings. Always parse them with `json_decode()` and handle potential null values gracefully.
+</Note>

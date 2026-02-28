@@ -1,0 +1,395 @@
+---
+title: Microphone
+description: Record audio from the device microphone with pause and resume capabilities
+---
+
+The Microphone API provides access to the device's microphone for audio recording. It supports recording, pausing, resuming, and stopping audio capture with event-based completion handling.
+
+## Usage
+
+Start recording audio from the microphone:
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+// Simple recording
+Microphone::record();
+
+// Recording with custom event tracking
+Microphone::record()
+    ->id('my-recording')
+    ->remember();
+```
+
+When recording completes, the `MicrophoneRecorded` event is dispatched with the file path.
+
+## Recording Control
+
+### Starting a Recording
+
+```php
+// Start recording
+Microphone::record()->start();
+
+// Or just call record() - it auto-starts on destruct
+Microphone::record();
+```
+
+### Pausing and Resuming
+
+```php
+// Pause the current recording
+Microphone::pause();
+
+// Resume the paused recording
+Microphone::resume();
+```
+
+### Stopping a Recording
+
+```php
+// Stop recording and trigger MicrophoneRecorded event
+Microphone::stop();
+```
+
+## Checking Recording Status
+
+Get the current recording state:
+
+```php
+$status = Microphone::getStatus();
+// Returns: "idle", "recording", or "paused"
+
+if ($status === 'recording') {
+    // Recording is active
+}
+```
+
+## Retrieving the Last Recording
+
+Get the path to the most recently recorded audio file:
+
+```php
+$path = Microphone::getRecording();
+
+if ($path) {
+    // File path to the audio recording
+    $url = Storage::url($path);
+}
+```
+
+## Listening for Events
+
+Listen for recording completion in your Livewire components:
+
+```php
+use Livewire\Attributes\On;
+use Native\Mobile\Events\Microphone\MicrophoneRecorded;
+use Native\Mobile\Events\Microphone\MicrophoneCancelled;
+
+class AudioRecorder extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneRecorded')]
+    public function handleRecording($data)
+    {
+        $path = $data['path'];
+        $mimeType = $data['mimeType']; // e.g., 'audio/m4a'
+        $id = $data['id'] ?? null;
+
+        // Process the recorded audio
+        $this->audioPath = $path;
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneCancelled')]
+    public function handleCancellation($data)
+    {
+        // User cancelled the recording
+    }
+}
+```
+
+## Tracking Multiple Recordings
+
+Use unique identifiers to track specific recordings:
+
+```php
+// Start recording with an ID
+Microphone::record()
+    ->id('voice-memo-' . time())
+    ->remember();
+
+// In your event handler, check the ID
+#[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneRecorded')]
+public function handleRecording($data)
+{
+    $recordingId = $data['id'];
+    $rememberedId = PendingMicrophone::lastId();
+
+    if ($recordingId === $rememberedId) {
+        // This is the recording we initiated
+    }
+}
+```
+
+## Custom Event Classes
+
+Dispatch custom events when recording completes:
+
+```php
+use Native\Mobile\Facades\Microphone;
+use App\Events\VoiceMessageRecorded;
+
+Microphone::record()
+    ->event(VoiceMessageRecorded::class);
+```
+
+Your custom event should accept the same parameters:
+
+```php
+namespace App\Events;
+
+class VoiceMessageRecorded
+{
+    public function __construct(
+        public string $path,
+        public string $mimeType = 'audio/m4a',
+        public ?string $id = null
+    ) {}
+}
+```
+
+## Methods Reference
+
+### Microphone Facade
+
+#### `record()`
+
+Creates a new microphone recording instance.
+
+**Returns:** `PendingMicrophone`
+
+```php
+Microphone::record();
+```
+
+#### `stop()`
+
+Stops the current recording and dispatches the `MicrophoneRecorded` event.
+
+**Returns:** `void`
+
+```php
+Microphone::stop();
+```
+
+#### `pause()`
+
+Pauses the current recording without stopping it.
+
+**Returns:** `void`
+
+```php
+Microphone::pause();
+```
+
+#### `resume()`
+
+Resumes a paused recording.
+
+**Returns:** `void`
+
+```php
+Microphone::resume();
+```
+
+#### `getStatus()`
+
+Returns the current recording status.
+
+**Returns:** `string` - One of: `"idle"`, `"recording"`, or `"paused"`
+
+```php
+$status = Microphone::getStatus();
+```
+
+#### `getRecording()`
+
+Returns the file path of the last recorded audio.
+
+**Returns:** `string|null`
+
+```php
+$path = Microphone::getRecording();
+```
+
+### PendingMicrophone Methods
+
+#### `id(string $id)`
+
+Sets a unique identifier for this recording.
+
+**Parameters:**
+- `$id` (string) - Unique identifier for the recording
+
+**Returns:** `self`
+
+```php
+Microphone::record()->id('my-recording');
+```
+
+#### `getId()`
+
+Gets the recording's unique identifier. Generates a UUID if not set.
+
+**Returns:** `string`
+
+```php
+$recording = Microphone::record();
+$id = $recording->getId();
+```
+
+#### `event(string $eventClass)`
+
+Sets a custom event class to dispatch when recording completes.
+
+**Parameters:**
+- `$eventClass` (string) - Fully qualified class name of the event
+
+**Returns:** `self`
+
+**Throws:** `InvalidArgumentException` if the class doesn't exist
+
+```php
+Microphone::record()->event(VoiceMessageRecorded::class);
+```
+
+#### `remember()`
+
+Stores the recording ID in the session for later retrieval.
+
+**Returns:** `self`
+
+```php
+Microphone::record()->id('my-recording')->remember();
+```
+
+#### `lastId()`
+
+Retrieves the last remembered recording ID from the session.
+
+**Returns:** `string|null`
+
+```php
+$lastId = PendingMicrophone::lastId();
+```
+
+#### `start()`
+
+Explicitly starts the recording.
+
+**Returns:** `bool` - `true` on success, `false` on failure
+
+```php
+Microphone::record()->start();
+```
+
+<Note>
+If you don't call `start()` explicitly, the recording will automatically start when the `PendingMicrophone` object is destroyed (at the end of the request).
+</Note>
+
+## Platform Notes
+
+### iOS
+
+- Recordings are saved in M4A format (AAC audio codec)
+- Requires microphone permission in Info.plist:
+  ```xml
+  <key>NSMicrophoneUsageDescription</key>
+  <string>We need access to record audio</string>
+  ```
+- Pause and resume are supported
+
+### Android
+
+- Recordings are saved in M4A format
+- Requires RECORD_AUDIO permission in AndroidManifest.xml:
+  ```xml
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  ```
+- Pause and resume are supported on Android 7.0 (API 24) and higher
+
+## Complete Example
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\Microphone;
+
+class VoiceRecorder extends Component
+{
+    public $isRecording = false;
+    public $isPaused = false;
+    public $audioPath = null;
+
+    public function startRecording()
+    {
+        Microphone::record()
+            ->id('voice-note-' . auth()->id())
+            ->remember();
+
+        $this->isRecording = true;
+    }
+
+    public function pauseRecording()
+    {
+        Microphone::pause();
+        $this->isPaused = true;
+    }
+
+    public function resumeRecording()
+    {
+        Microphone::resume();
+        $this->isPaused = false;
+    }
+
+    public function stopRecording()
+    {
+        Microphone::stop();
+        $this->isRecording = false;
+        $this->isPaused = false;
+    }
+
+    public function checkStatus()
+    {
+        $status = Microphone::getStatus();
+        $this->isRecording = in_array($status, ['recording', 'paused']);
+        $this->isPaused = $status === 'paused';
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneRecorded')]
+    public function handleRecording($data)
+    {
+        $this->audioPath = $data['path'];
+        $this->isRecording = false;
+
+        // Save to database or process the audio
+        VoiceNote::create([
+            'user_id' => auth()->id(),
+            'path' => $this->audioPath,
+            'mime_type' => $data['mimeType'],
+        ]);
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneCancelled')]
+    public function handleCancellation()
+    {
+        $this->isRecording = false;
+        $this->isPaused = false;
+    }
+
+    public function render()
+    {
+        return view('livewire.voice-recorder');
+    }
+}
+```

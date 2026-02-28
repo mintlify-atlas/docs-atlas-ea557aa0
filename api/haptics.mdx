@@ -1,0 +1,50 @@
+---
+title: Haptics
+description: Trigger haptic vibration feedback
+---
+
+<Warning>
+  This facade is deprecated since version 2.0.0. Use `Device::vibrate()` instead.
+</Warning>
+
+## Import
+
+```php
+use Native\Mobile\Facades\Haptics;
+```
+
+## Methods
+
+### vibrate() <Badge type="warn">Deprecated</Badge>
+
+Trigger a haptic vibration.
+
+```php
+use Native\Mobile\Facades\Haptics;
+
+Haptics::vibrate();
+```
+
+<Note>
+  This method has been deprecated. Use `Device::vibrate()` for haptic feedback.
+</Note>
+
+## Migration
+
+To migrate from the deprecated `Haptics` facade to the `Device` facade:
+
+**Before (Deprecated):**
+```php
+use Native\Mobile\Facades\Haptics;
+
+Haptics::vibrate();
+```
+
+**After (Recommended):**
+```php
+use Native\Mobile\Facades\Device;
+
+$success = Device::vibrate();
+```
+
+See the [Device API](/api/device) documentation for more information.

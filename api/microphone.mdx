@@ -1,0 +1,451 @@
+---
+title: Microphone
+description: Record audio from the device microphone with playback controls
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Microphone;
+```
+
+## Methods
+
+### record()
+
+Start microphone recording. Returns a `PendingMicrophone` instance for fluent configuration.
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+$recording = Microphone::record();
+```
+
+<ResponseField name="return" type="PendingMicrophone">
+  A pending microphone instance for fluent configuration
+</ResponseField>
+
+**Events:** Triggers `MicrophoneRecorded` or `MicrophoneCancelled` events.
+
+### stop()
+
+Stop the current microphone recording. The recorded audio file path will be dispatched via the `MicrophoneRecorded` event.
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+Microphone::stop();
+```
+
+### pause()
+
+Pause the current microphone recording without stopping it.
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+Microphone::pause();
+```
+
+### resume()
+
+Resume a paused microphone recording.
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+Microphone::resume();
+```
+
+### getStatus()
+
+Get the current recording status.
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+$status = Microphone::getStatus();
+// Returns: 'idle', 'recording', or 'paused'
+```
+
+<ResponseField name="return" type="string">
+  Recording status: `'idle'`, `'recording'`, or `'paused'`
+</ResponseField>
+
+### getRecording()
+
+Get the path to the last recorded audio file.
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+$path = Microphone::getRecording();
+```
+
+<ResponseField name="return" type="string|null">
+  Path to the last recording, or null if none exists
+</ResponseField>
+
+## PendingMicrophone Methods
+
+### id()
+
+Set a unique identifier for this microphone recording to correlate with events.
+
+<ParamField path="id" type="string" required>
+  Unique identifier
+</ParamField>
+
+```php
+Microphone::record()
+    ->id('voice-note-123');
+```
+
+### getId()
+
+Get the microphone recorder's unique identifier.
+
+```php
+$pending = Microphone::record();
+$id = $pending->getId(); // Returns UUID if not manually set
+```
+
+### event()
+
+Set a custom event class to dispatch when microphone recording completes.
+
+<ParamField path="eventClass" type="string" required>
+  Fully qualified event class name
+</ParamField>
+
+```php
+Microphone::record()
+    ->event(App\Events\VoiceNoteRecorded::class);
+```
+
+### remember()
+
+Store this microphone recorder's ID in session for retrieval in event handlers.
+
+```php
+Microphone::record()
+    ->id('recording-123')
+    ->remember();
+```
+
+### lastId()
+
+Retrieve the last remembered microphone recorder ID from session.
+
+```php
+$lastId = \Native\Mobile\PendingMicrophone::lastId();
+```
+
+### start()
+
+Explicitly start the microphone recording.
+
+```php
+$success = Microphone::record()
+    ->id('recording-123')
+    ->start();
+```
+
+## Events
+
+### MicrophoneRecorded
+
+Dispatched when microphone recording completes successfully.
+
+```php
+use Native\Mobile\Events\Microphone\MicrophoneRecorded;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(MicrophoneRecorded::class, function (MicrophoneRecorded $event) {
+    $audioPath = $event->path;
+    $mimeType = $event->mimeType; // e.g., 'audio/m4a'
+    $id = $event->id;
+});
+```
+
+**Event Properties:**
+- `path` (string) - File path to the recorded audio
+- `mimeType` (string) - MIME type (default: 'audio/m4a')
+- `id` (string|null) - Tracking ID if set
+
+### MicrophoneCancelled
+
+Dispatched when microphone recording is cancelled.
+
+**Event Properties:**
+- `cancelled` (bool) - Always true
+- `id` (string|null) - Tracking ID if set
+
+## Examples
+
+### Voice Note Recorder
+
+```php
+use Native\Mobile\Facades\Microphone;
+use Native\Mobile\Events\Microphone\MicrophoneRecorded;
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class VoiceNoteRecorder extends Component
+{
+    public $isRecording = false;
+    public $isPaused = false;
+    public $recordingPath = null;
+    
+    public function startRecording()
+    {
+        Microphone::record()
+            ->id('voice-note-' . time())
+            ->remember();
+        
+        $this->isRecording = true;
+    }
+    
+    public function pauseRecording()
+    {
+        Microphone::pause();
+        $this->isPaused = true;
+    }
+    
+    public function resumeRecording()
+    {
+        Microphone::resume();
+        $this->isPaused = false;
+    }
+    
+    public function stopRecording()
+    {
+        Microphone::stop();
+        $this->isRecording = false;
+        $this->isPaused = false;
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneRecorded')]
+    public function handleRecording($data)
+    {
+        $this->recordingPath = $data['path'];
+        
+        // Save to database
+        VoiceNote::create([
+            'user_id' => auth()->id(),
+            'path' => $data['path'],
+            'mime_type' => $data['mimeType'],
+        ]);
+        
+        Dialog::toast('Voice note saved successfully');
+    }
+}
+```
+
+### Recording Status Monitor
+
+```php
+use Native\Mobile\Facades\Microphone;
+use Livewire\Component;
+
+class RecordingStatus extends Component
+{
+    public $status = 'idle';
+    public $timer = 0;
+    
+    public function mount()
+    {
+        $this->updateStatus();
+    }
+    
+    public function updateStatus()
+    {
+        $this->status = Microphone::getStatus();
+        
+        if ($this->status === 'recording') {
+            $this->timer++;
+        }
+    }
+    
+    public function render()
+    {
+        return view('livewire.recording-status', [
+            'statusText' => match($this->status) {
+                'recording' => 'Recording...',
+                'paused' => 'Paused',
+                default => 'Ready',
+            },
+        ]);
+    }
+}
+```
+
+### Audio Message for Chat
+
+```php
+use Native\Mobile\Facades\Microphone;
+use Native\Mobile\Events\Microphone\MicrophoneRecorded;
+use Livewire\Attributes\On;
+
+class ChatAudioMessage extends Component
+{
+    public $conversationId;
+    public $isRecording = false;
+    
+    public function recordAudio()
+    {
+        Microphone::record()
+            ->id('chat-audio-' . $this->conversationId)
+            ->remember();
+        
+        $this->isRecording = true;
+    }
+    
+    public function cancelRecording()
+    {
+        Microphone::stop();
+        $this->isRecording = false;
+    }
+    
+    public function sendRecording()
+    {
+        Microphone::stop();
+        $this->isRecording = false;
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Microphone\\MicrophoneRecorded')]
+    public function handleAudioRecorded($data)
+    {
+        // Upload audio file
+        $url = $this->uploadAudio($data['path']);
+        
+        // Send message
+        Message::create([
+            'conversation_id' => $this->conversationId,
+            'user_id' => auth()->id(),
+            'type' => 'audio',
+            'content' => $url,
+            'duration' => $this->getAudioDuration($data['path']),
+        ]);
+        
+        $this->dispatch('message-sent');
+    }
+    
+    private function uploadAudio(string $path): string
+    {
+        // Upload to storage and return URL
+        return Storage::put('audio', new File($path));
+    }
+}
+```
+
+### Podcast Recording App
+
+```php
+use Native\Mobile\Facades\Microphone;
+use Native\Mobile\Facades\Device;
+
+class PodcastRecorder extends Component
+{
+    public $episodeTitle;
+    public $isRecording = false;
+    public $isPaused = false;
+    public $elapsedTime = 0;
+    
+    public function startEpisode()
+    {
+        if (!$this->episodeTitle) {
+            Dialog::alert('Title Required', 'Please enter an episode title', ['OK']);
+            return;
+        }
+        
+        // Provide haptic feedback
+        Device::vibrate();
+        
+        Microphone::record()
+            ->id('podcast-' . Str::slug($this->episodeTitle))
+            ->remember();
+        
+        $this->isRecording = true;
+    }
+    
+    public function togglePause()
+    {
+        if ($this->isPaused) {
+            Microphone::resume();
+            Device::vibrate();
+        } else {
+            Microphone::pause();
+            Device::vibrate();
+        }
+        
+        $this->isPaused = !$this->isPaused;
+    }
+    
+    public function finishEpisode()
+    {
+        Microphone::stop();
+        Device::vibrate();
+        
+        $this->isRecording = false;
+        $this->isPaused = false;
+    }
+}
+```
+
+### Check Recording Availability
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+class RecordingHelper
+{
+    public function canRecord(): bool
+    {
+        $status = Microphone::getStatus();
+        return $status === 'idle';
+    }
+    
+    public function isCurrentlyRecording(): bool
+    {
+        $status = Microphone::getStatus();
+        return in_array($status, ['recording', 'paused']);
+    }
+    
+    public function getLastRecordingPath(): ?string
+    {
+        return Microphone::getRecording();
+    }
+}
+```
+
+### Auto-Save Draft Recording
+
+```php
+use Native\Mobile\Facades\Microphone;
+use Native\Mobile\Events\Microphone\MicrophoneRecorded;
+
+class DraftRecording
+{
+    public function saveDraft()
+    {
+        $status = Microphone::getStatus();
+        
+        if ($status === 'recording' || $status === 'paused') {
+            Microphone::stop();
+        }
+        
+        $path = Microphone::getRecording();
+        
+        if ($path) {
+            Draft::create([
+                'user_id' => auth()->id(),
+                'audio_path' => $path,
+                'created_at' => now(),
+            ]);
+            
+            Dialog::toast('Draft saved');
+        }
+    }
+}
+```

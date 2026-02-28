@@ -1,0 +1,428 @@
+---
+title: Plugin Commands
+description: All plugin commands for NativePHP Mobile
+---
+
+NativePHP Mobile plugins extend your app with native functionality. These commands help you create, manage, and validate plugins.
+
+## native:plugin:create
+
+Create a new NativePHP Mobile plugin with scaffolding for Android, iOS, and PHP code.
+
+### Syntax
+
+```bash
+php artisan native:plugin:create [name] [options]
+```
+
+### Arguments
+
+**name** - The plugin name (e.g., `haptics` or `vendor/plugin-haptics`). Optional, will prompt if not provided.
+
+### Options
+
+- `--namespace=NAME` - The plugin namespace
+- `--path=PATH` - Custom output path
+- `--force` - Overwrite existing files
+- `--with-boost` - Generate Boost AI guidelines
+
+### Examples
+
+```bash
+# Create plugin with prompts
+php artisan native:plugin:create
+
+# Create plugin with vendor/package format
+php artisan native:plugin:create nativephp/plugin-haptics
+
+# Create with custom namespace
+php artisan native:plugin:create haptics --namespace=Haptics
+
+# Create with Boost AI guidelines
+php artisan native:plugin:create haptics --with-boost
+```
+
+### What it creates
+
+- `composer.json` - Composer package definition
+- `nativephp.json` - Plugin manifest
+- `src/` - PHP service provider, facade, implementation
+- `resources/android/` - Kotlin bridge functions
+- `resources/ios/` - Swift bridge functions
+- `resources/js/` - JavaScript client library
+- `src/Events/` - Example event classes
+- `src/Commands/` - Lifecycle hook commands
+- `tests/` - Pest test suite
+- `README.md` - Documentation
+
+---
+
+## native:plugin:register
+
+Register a NativePHP plugin in NativeServiceProvider.
+
+### Syntax
+
+```bash
+php artisan native:plugin:register [plugin] [options]
+```
+
+### Arguments
+
+**plugin** - The plugin package name (e.g., `vendor/plugin-name`). Optional for interactive mode.
+
+### Options
+
+- `--remove` - Remove the plugin instead of adding it
+- `--force` - Skip conflict warnings
+
+### Examples
+
+```bash
+# Interactive mode: select from unregistered plugins
+php artisan native:plugin:register
+
+# Register specific plugin
+php artisan native:plugin:register nativephp/plugin-haptics
+
+# Remove plugin
+php artisan native:plugin:register nativephp/plugin-haptics --remove
+
+# Register with conflict override
+php artisan native:plugin:register vendor/plugin --force
+```
+
+### What it does
+
+1. Adds plugin service provider to `app/Providers/NativeServiceProvider.php`
+2. Checks for conflicts (namespace/bridge function collisions)
+3. Validates plugin is installed via Composer
+
+---
+
+## native:plugin:list
+
+List all installed NativePHP Mobile plugins.
+
+### Syntax
+
+```bash
+php artisan native:plugin:list [options]
+```
+
+### Options
+
+- `--json` - Output as JSON
+- `--all` - Show all installed plugins, including unregistered ones
+
+### Examples
+
+```bash
+# List registered plugins
+php artisan native:plugin:list
+
+# List all plugins (including unregistered)
+php artisan native:plugin:list --all
+
+# JSON output for scripts
+php artisan native:plugin:list --json
+```
+
+### Output
+
+Shows:
+- Package name and version
+- Namespace
+- Number of bridge functions
+- Platform support (Android/iOS)
+- Registration status
+
+---
+
+## native:plugin:install-agent
+
+Install AI agents for NativePHP plugin development.
+
+### Syntax
+
+```bash
+php artisan native:plugin:install-agent [options]
+```
+
+### Options
+
+- `--force` - Overwrite existing agent files
+- `--all` - Install all agents without prompting
+
+### Available Agents
+
+- **kotlin-android-expert** - Deep Android native development
+- **swift-ios-expert** - Deep iOS native development
+- **js-bridge-expert** - JavaScript client-side integration
+- **plugin-writer** - General plugin scaffolding
+- **plugin-docs-writer** - Documentation and Boost guidelines
+
+### Examples
+
+```bash
+# Interactive selection
+php artisan native:plugin:install-agent
+
+# Install all agents
+php artisan native:plugin:install-agent --all
+
+# Overwrite existing
+php artisan native:plugin:install-agent --force
+```
+
+---
+
+## native:plugin:uninstall
+
+Uninstall a NativePHP Mobile plugin completely.
+
+### Syntax
+
+```bash
+php artisan native:plugin:uninstall {plugin} [options]
+```
+
+### Arguments
+
+**plugin** - The plugin package name (e.g., `vendor/plugin-name`). Required.
+
+### Options
+
+- `--force` - Skip confirmation prompts
+- `--keep-files` - Do not delete the plugin source directory
+
+### Examples
+
+```bash
+# Uninstall with confirmation
+php artisan native:plugin:uninstall vendor/plugin-name
+
+# Force uninstall without prompts
+php artisan native:plugin:uninstall vendor/plugin-name --force
+
+# Uninstall but keep source files
+php artisan native:plugin:uninstall vendor/plugin-name --keep-files
+```
+
+### What it does
+
+1. Unregisters from NativeServiceProvider
+2. Runs `composer remove`
+3. Removes repository from composer.json (if path repository)
+4. Deletes source directory (unless `--keep-files`)
+
+---
+
+## native:plugin:validate
+
+Validate installed NativePHP Mobile plugins or a specific plugin.
+
+### Syntax
+
+```bash
+php artisan native:plugin:validate [path]
+```
+
+### Arguments
+
+**path** - Path to a specific plugin directory. Optional.
+
+### Examples
+
+```bash
+# Validate all installed plugins
+php artisan native:plugin:validate
+
+# Validate specific plugin
+php artisan native:plugin:validate ./packages/vendor/plugin-name
+```
+
+### Validation Checks
+
+- **composer.json**: Valid JSON, correct type, required fields
+- **nativephp.json**: Valid manifest, bridge functions, hooks
+- **Directory structure**: Required directories present
+- **Bridge functions**: Kotlin/Swift implementations exist
+- **Hooks**: Valid hook types and commands
+- **Assets**: Source files exist, correct destinations
+- **Platform requirements**: Minimum version specified
+
+### Output
+
+For each plugin:
+- ✅ **OK** - No issues
+- ⚠️ **WARN** - Warnings (non-critical)
+- ❌ **FAIL** - Errors (must fix)
+
+---
+
+## native:plugin:make-hook
+
+Create a lifecycle hook command for a NativePHP plugin.
+
+### Syntax
+
+```bash
+php artisan native:plugin:make-hook [plugin] [hook] [options]
+```
+
+### Arguments
+
+- **plugin** - Path to the plugin directory. Optional, will prompt.
+- **hook** - Hook type. Optional, will prompt.
+
+### Hook Types
+
+- `pre_compile` - Runs before native code is compiled
+- `post_compile` - Runs after native code compilation
+- `copy_assets` - Copy assets to native project
+- `post_build` - Runs after native build completes
+
+### Options
+
+- `--force` - Overwrite existing file
+
+### Examples
+
+```bash
+# Interactive mode
+php artisan native:plugin:make-hook
+
+# Create copy_assets hook
+php artisan native:plugin:make-hook ./packages/vendor/plugin copy_assets
+
+# Overwrite existing hook
+php artisan native:plugin:make-hook --force
+```
+
+### What it creates
+
+- Command class in `src/Commands/`
+- Updates `nativephp.json` with hook registration
+- Updates ServiceProvider to register command
+
+### Available Helpers
+
+Hook commands extend `NativePluginHookCommand` with helpers:
+
+```php
+$this->platform()           // 'ios' or 'android'
+$this->isAndroid()          // bool
+$this->isIos()              // bool
+$this->buildPath()          // Path to native project
+$this->pluginPath()         // Path to this plugin
+$this->appId()              // e.g., 'com.example.app'
+$this->copyToAndroidAssets($src, $dest)
+$this->copyToIosBundle($src, $dest)
+$this->downloadIfMissing($url, $dest)
+```
+
+---
+
+## native:plugin:boost
+
+Create Boost AI guidelines for a NativePHP plugin.
+
+### Syntax
+
+```bash
+php artisan native:plugin:boost [plugin] [options]
+```
+
+### Arguments
+
+**plugin** - The plugin name or path. Optional, will prompt.
+
+### Options
+
+- `--force` - Overwrite existing guidelines
+
+### Examples
+
+```bash
+# Interactive selection
+php artisan native:plugin:boost
+
+# Specific plugin by path
+php artisan native:plugin:boost ./packages/vendor/plugin
+
+# Overwrite existing
+php artisan native:plugin:boost vendor/plugin --force
+```
+
+### What it creates
+
+Creates `resources/boost/guidelines/core.blade.php` with:
+
+- Installation instructions
+- PHP usage examples (Facade, Livewire)
+- Available methods documentation
+- Event listener examples
+- JavaScript usage examples (Vue, React, Inertia)
+
+### Benefits
+
+When users install your plugin and run `php artisan boost:install`, your guidelines are automatically loaded and available to AI assistants.
+
+---
+
+## Complete Plugin Workflow
+
+### 1. Create a new plugin
+
+```bash
+php artisan native:plugin:create nativephp/plugin-haptics --with-boost
+```
+
+### 2. Add to your project
+
+Add to `composer.json`:
+
+```json
+{
+  "repositories": [
+    {
+      "type": "path",
+      "url": "./packages/nativephp/plugin-haptics"
+    }
+  ]
+}
+```
+
+```bash
+composer require nativephp/plugin-haptics
+```
+
+### 3. Register the plugin
+
+```bash
+php artisan native:plugin:register
+```
+
+### 4. Validate
+
+```bash
+php artisan native:plugin:validate
+```
+
+### 5. Create hooks (optional)
+
+```bash
+php artisan native:plugin:make-hook
+```
+
+### 6. List installed plugins
+
+```bash
+php artisan native:plugin:list
+```
+
+## See also
+
+- [Creating Plugins](/advanced/custom-plugins) - Plugin development guide
+- [Plugin Lifecycle](/advanced/custom-plugins) - Hook system documentation

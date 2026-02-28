@@ -1,0 +1,437 @@
+---
+title: Secure Storage
+description: Store sensitive data securely in the device keychain or keystore
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+```
+
+## Methods
+
+### set()
+
+Store a value securely in the native keychain (iOS) or keystore (Android).
+
+<ParamField path="key" type="string" required>
+  The key to store the value under
+</ParamField>
+
+<ParamField path="value" type="string|null" required>
+  The value to store securely
+</ParamField>
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+$success = SecureStorage::set('api_token', 'secret-token-123');
+```
+
+<ResponseField name="return" type="bool">
+  True if successfully stored, false otherwise
+</ResponseField>
+
+### get()
+
+Retrieve a secure value from the native keychain or keystore.
+
+<ParamField path="key" type="string" required>
+  The key to retrieve the value for
+</ParamField>
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+$token = SecureStorage::get('api_token');
+```
+
+<ResponseField name="return" type="string|null">
+  The stored value, or null if not found
+</ResponseField>
+
+### delete()
+
+Delete a secure value from the native keychain or keystore.
+
+<ParamField path="key" type="string" required>
+  The key to delete the value for
+</ParamField>
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+$success = SecureStorage::delete('api_token');
+```
+
+<ResponseField name="return" type="bool">
+  True if successfully deleted, false otherwise
+</ResponseField>
+
+## Security Features
+
+<Card title="iOS Keychain" icon="apple">
+  On iOS, data is stored in the iOS Keychain with hardware-backed encryption when available. Data is protected by device passcode and biometrics.
+</Card>
+
+<Card title="Android Keystore" icon="android">
+  On Android, data is stored in the Android Keystore System with hardware-backed encryption when available. Data is protected by device credentials.
+</Card>
+
+## Examples
+
+### Store Authentication Token
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class AuthService
+{
+    public function login(string $email, string $password)
+    {
+        $response = Http::post('https://api.example.com/login', [
+            'email' => $email,
+            'password' => $password,
+        ]);
+        
+        if ($response->successful()) {
+            $token = $response->json('token');
+            
+            // Store token securely
+            SecureStorage::set('auth_token', $token);
+            SecureStorage::set('user_id', $response->json('user_id'));
+            
+            return true;
+        }
+        
+        return false;
+    }
+    
+    public function getAuthToken(): ?string
+    {
+        return SecureStorage::get('auth_token');
+    }
+    
+    public function logout()
+    {
+        SecureStorage::delete('auth_token');
+        SecureStorage::delete('user_id');
+    }
+}
+```
+
+### API Key Management
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class ApiKeyManager
+{
+    private const KEY_PREFIX = 'api_key_';
+    
+    public function storeApiKey(string $service, string $apiKey): bool
+    {
+        $key = self::KEY_PREFIX . $service;
+        return SecureStorage::set($key, $apiKey);
+    }
+    
+    public function getApiKey(string $service): ?string
+    {
+        $key = self::KEY_PREFIX . $service;
+        return SecureStorage::get($key);
+    }
+    
+    public function removeApiKey(string $service): bool
+    {
+        $key = self::KEY_PREFIX . $service;
+        return SecureStorage::delete($key);
+    }
+    
+    public function hasApiKey(string $service): bool
+    {
+        return $this->getApiKey($service) !== null;
+    }
+}
+```
+
+### Secure User Preferences
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class SecurePreferences
+{
+    public function setEncryptedPreference(string $key, mixed $value): bool
+    {
+        $encrypted = encrypt(json_encode($value));
+        return SecureStorage::set($key, $encrypted);
+    }
+    
+    public function getEncryptedPreference(string $key, mixed $default = null): mixed
+    {
+        $encrypted = SecureStorage::get($key);
+        
+        if ($encrypted === null) {
+            return $default;
+        }
+        
+        try {
+            return json_decode(decrypt($encrypted), true);
+        } catch (\Exception $e) {
+            return $default;
+        }
+    }
+    
+    public function clearPreference(string $key): bool
+    {
+        return SecureStorage::delete($key);
+    }
+}
+```
+
+### OAuth Token Storage
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class OAuthTokenManager
+{
+    public function storeTokens(array $tokens): void
+    {
+        SecureStorage::set('oauth_access_token', $tokens['access_token']);
+        SecureStorage::set('oauth_refresh_token', $tokens['refresh_token'] ?? '');
+        SecureStorage::set('oauth_expires_at', $tokens['expires_at'] ?? '');
+    }
+    
+    public function getAccessToken(): ?string
+    {
+        $token = SecureStorage::get('oauth_access_token');
+        $expiresAt = SecureStorage::get('oauth_expires_at');
+        
+        if (!$token) {
+            return null;
+        }
+        
+        // Check if token is expired
+        if ($expiresAt && time() > (int) $expiresAt) {
+            // Try to refresh
+            return $this->refreshToken();
+        }
+        
+        return $token;
+    }
+    
+    public function refreshToken(): ?string
+    {
+        $refreshToken = SecureStorage::get('oauth_refresh_token');
+        
+        if (!$refreshToken) {
+            return null;
+        }
+        
+        $response = Http::post('https://api.example.com/oauth/refresh', [
+            'refresh_token' => $refreshToken,
+        ]);
+        
+        if ($response->successful()) {
+            $tokens = $response->json();
+            $this->storeTokens($tokens);
+            return $tokens['access_token'];
+        }
+        
+        return null;
+    }
+    
+    public function clearTokens(): void
+    {
+        SecureStorage::delete('oauth_access_token');
+        SecureStorage::delete('oauth_refresh_token');
+        SecureStorage::delete('oauth_expires_at');
+    }
+}
+```
+
+### Biometric-Protected Data
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+use Native\Mobile\Facades\Biometrics;
+
+class BiometricStorage
+{
+    public function storeSecureData(string $key, string $value): void
+    {
+        // Store data
+        SecureStorage::set($key, $value);
+        
+        // Mark as requiring biometric authentication
+        SecureStorage::set($key . '_requires_biometric', 'true');
+    }
+    
+    public function retrieveSecureData(string $key, callable $onSuccess, callable $onFailure): void
+    {
+        $requiresBiometric = SecureStorage::get($key . '_requires_biometric');
+        
+        if ($requiresBiometric === 'true') {
+            // Require biometric authentication
+            Biometrics::prompt()->id('secure-data-' . $key);
+            
+            Event::listen(Completed::class, function ($event) use ($key, $onSuccess, $onFailure) {
+                if ($event->id === 'secure-data-' . $key) {
+                    if ($event->success) {
+                        $value = SecureStorage::get($key);
+                        $onSuccess($value);
+                    } else {
+                        $onFailure();
+                    }
+                }
+            });
+        } else {
+            $value = SecureStorage::get($key);
+            $onSuccess($value);
+        }
+    }
+}
+```
+
+### Session Management
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class SecureSession
+{
+    private const SESSION_KEY = 'secure_session';
+    
+    public function startSession(array $data): bool
+    {
+        $sessionData = [
+            'started_at' => time(),
+            'data' => $data,
+        ];
+        
+        return SecureStorage::set(
+            self::SESSION_KEY,
+            json_encode($sessionData)
+        );
+    }
+    
+    public function getSession(): ?array
+    {
+        $json = SecureStorage::get(self::SESSION_KEY);
+        
+        if (!$json) {
+            return null;
+        }
+        
+        $session = json_decode($json, true);
+        
+        // Check if session expired (24 hours)
+        if (time() - $session['started_at'] > 86400) {
+            $this->endSession();
+            return null;
+        }
+        
+        return $session['data'];
+    }
+    
+    public function updateSession(array $data): bool
+    {
+        $session = $this->getSession();
+        
+        if (!$session) {
+            return false;
+        }
+        
+        return $this->startSession(array_merge($session, $data));
+    }
+    
+    public function endSession(): bool
+    {
+        return SecureStorage::delete(self::SESSION_KEY);
+    }
+}
+```
+
+### Credit Card Storage (PCI Compliant)
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class SecurePaymentStorage
+{
+    /**
+     * Store tokenized payment information (never store actual card numbers)
+     */
+    public function storePaymentToken(string $token, array $metadata): bool
+    {
+        $data = [
+            'token' => $token,
+            'last_four' => $metadata['last_four'] ?? '',
+            'brand' => $metadata['brand'] ?? '',
+            'exp_month' => $metadata['exp_month'] ?? '',
+            'exp_year' => $metadata['exp_year'] ?? '',
+        ];
+        
+        return SecureStorage::set('payment_token', json_encode($data));
+    }
+    
+    public function getPaymentToken(): ?array
+    {
+        $json = SecureStorage::get('payment_token');
+        
+        if (!$json) {
+            return null;
+        }
+        
+        return json_decode($json, true);
+    }
+    
+    public function clearPaymentToken(): bool
+    {
+        return SecureStorage::delete('payment_token');
+    }
+}
+```
+
+### Encryption Key Storage
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+class KeyManager
+{
+    public function generateAndStoreKey(string $keyName): string
+    {
+        // Generate a random encryption key
+        $key = bin2hex(random_bytes(32));
+        
+        // Store it securely
+        SecureStorage::set('key_' . $keyName, $key);
+        
+        return $key;
+    }
+    
+    public function getKey(string $keyName): ?string
+    {
+        return SecureStorage::get('key_' . $keyName);
+    }
+    
+    public function rotateKey(string $keyName): string
+    {
+        // Get old key
+        $oldKey = $this->getKey($keyName);
+        
+        // Generate new key
+        $newKey = $this->generateAndStoreKey($keyName);
+        
+        // Store old key for decryption of old data
+        if ($oldKey) {
+            SecureStorage::set('key_' . $keyName . '_old', $oldKey);
+        }
+        
+        return $newKey;
+    }
+}
+```

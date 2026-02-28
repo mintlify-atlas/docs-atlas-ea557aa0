@@ -1,0 +1,483 @@
+---
+title: Scanner
+description: Scan QR codes and barcodes using the device camera
+---
+
+The Scanner API provides access to the device camera for scanning QR codes and various barcode formats. It supports both single-scan and continuous scanning modes.
+
+## Usage
+
+Scan a QR code:
+
+```php
+use Native\Mobile\Facades\Scanner;
+
+// Simple QR code scan
+Scanner::scan();
+
+// With custom prompt
+Scanner::scan()
+    ->prompt('Scan the QR code on the product');
+```
+
+When a code is scanned, the `CodeScanned` event is dispatched with the scanned data.
+
+## Scanning Modes
+
+### Single Scan (Default)
+
+Scans one code and automatically closes the scanner:
+
+```php
+Scanner::scan()
+    ->prompt('Scan membership card');
+```
+
+### Continuous Scanning
+
+Keeps the scanner open to scan multiple codes:
+
+```php
+Scanner::scan()
+    ->continuous()
+    ->prompt('Scan all items');
+```
+
+## Barcode Formats
+
+By default, the scanner only scans QR codes. You can specify which formats to scan:
+
+```php
+// Scan QR codes only (default)
+Scanner::scan();
+
+// Scan specific formats
+Scanner::scan()
+    ->formats(['ean13', 'ean8', 'code128']);
+
+// Scan all supported formats
+Scanner::scan()
+    ->formats(['all']);
+```
+
+### Supported Formats
+
+- `qr` - QR codes
+- `ean13` - EAN-13 barcodes
+- `ean8` - EAN-8 barcodes
+- `code128` - Code 128 barcodes
+- `code39` - Code 39 barcodes
+- `upca` - UPC-A barcodes
+- `upce` - UPC-E barcodes
+- `all` - All supported formats
+
+## Listening for Scans
+
+Listen for the `CodeScanned` event in your Livewire components:
+
+```php
+use Livewire\Attributes\On;
+use Native\Mobile\Events\Scanner\CodeScanned;
+use Native\Mobile\Events\Scanner\ScannerCancelled;
+
+class ProductScanner extends Component
+{
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleScan($data)
+    {
+        $code = $data['data'];     // The scanned data
+        $format = $data['format']; // The barcode format (e.g., 'qr', 'ean13')
+        $id = $data['id'] ?? null; // Optional scan session ID
+
+        // Process the scanned code
+        $this->lookupProduct($code);
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Scanner\\ScannerCancelled')]
+    public function handleCancellation($data)
+    {
+        // User cancelled the scanner
+    }
+}
+```
+
+## Tracking Scan Sessions
+
+Use unique identifiers to track specific scan sessions:
+
+```php
+// Start scanning with an ID
+Scanner::scan()
+    ->id('checkout-scan')
+    ->continuous()
+    ->prompt('Scan items to add to cart');
+
+// In your event handler
+#[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+public function handleScan($data)
+{
+    $sessionId = $data['id'];
+
+    if ($sessionId === 'checkout-scan') {
+        // This scan belongs to the checkout session
+        $this->addToCart($data['data']);
+    }
+}
+```
+
+## Methods Reference
+
+### Scanner Facade
+
+#### `scan()`
+
+Creates a new scanner instance.
+
+**Returns:** `PendingScanner`
+
+```php
+Scanner::scan();
+```
+
+#### `make()`
+
+Alias for `scan()` to match other NativePHP patterns.
+
+**Returns:** `PendingScanner`
+
+```php
+Scanner::make();
+```
+
+### PendingScanner Methods
+
+#### `prompt(string $prompt)`
+
+Sets the text shown on the scanner screen.
+
+**Parameters:**
+- `$prompt` (string) - The prompt text to display
+
+**Returns:** `self`
+
+**Default:** `"Scan QR Code"`
+
+```php
+Scanner::scan()->prompt('Point camera at barcode');
+```
+
+#### `continuous(bool $continuous = true)`
+
+Enables or disables continuous scanning mode.
+
+**Parameters:**
+- `$continuous` (bool) - Whether to keep scanning after each code
+
+**Returns:** `self`
+
+**Default:** `false` (scan once and close)
+
+```php
+// Enable continuous scanning
+Scanner::scan()->continuous();
+
+// Disable continuous scanning
+Scanner::scan()->continuous(false);
+```
+
+#### `formats(array $formats)`
+
+Sets which barcode formats to scan.
+
+**Parameters:**
+- `$formats` (array) - Array of format names
+
+**Returns:** `self`
+
+**Default:** `['qr']`
+
+**Available formats:**
+- `'qr'` - QR codes
+- `'ean13'` - EAN-13
+- `'ean8'` - EAN-8
+- `'code128'` - Code 128
+- `'code39'` - Code 39
+- `'upca'` - UPC-A
+- `'upce'` - UPC-E
+- `'all'` - All supported formats
+
+```php
+// Scan multiple formats
+Scanner::scan()->formats(['qr', 'ean13', 'code128']);
+
+// Scan all formats
+Scanner::scan()->formats(['all']);
+```
+
+#### `id(string $id)`
+
+Sets a unique identifier for this scan session.
+
+**Parameters:**
+- `$id` (string) - Unique identifier
+
+**Returns:** `self`
+
+```php
+Scanner::scan()->id('inventory-check-' . time());
+```
+
+#### `getId()`
+
+Gets the scan session ID.
+
+**Returns:** `string|null`
+
+```php
+$scanner = Scanner::scan()->id('my-scan');
+$id = $scanner->getId(); // 'my-scan'
+```
+
+#### `scan()`
+
+Explicitly starts the scanner.
+
+**Returns:** `void`
+
+```php
+Scanner::scan()->scan();
+```
+
+<Note>
+If you don't call `scan()` explicitly, the scanner will automatically start when the `PendingScanner` object is destroyed.
+</Note>
+
+## Examples
+
+### Product Lookup
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\Scanner;
+
+class ProductLookup extends Component
+{
+    public $product = null;
+    public $scanning = false;
+
+    public function startScan()
+    {
+        Scanner::scan()
+            ->prompt('Scan product barcode')
+            ->formats(['ean13', 'ean8', 'upca', 'upce']);
+
+        $this->scanning = true;
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleScan($data)
+    {
+        $barcode = $data['data'];
+
+        // Look up product by barcode
+        $this->product = Product::where('barcode', $barcode)->first();
+
+        if (!$this->product) {
+            session()->flash('error', 'Product not found');
+        }
+
+        $this->scanning = false;
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Scanner\\ScannerCancelled')]
+    public function handleCancellation()
+    {
+        $this->scanning = false;
+    }
+
+    public function render()
+    {
+        return view('livewire.product-lookup');
+    }
+}
+```
+
+### Inventory Check
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\Scanner;
+
+class InventoryCheck extends Component
+{
+    public $scannedItems = [];
+    public $isScanning = false;
+
+    public function startInventory()
+    {
+        Scanner::scan()
+            ->id('inventory-' . now()->timestamp)
+            ->continuous()
+            ->formats(['qr', 'ean13'])
+            ->prompt('Scan all items in inventory');
+
+        $this->isScanning = true;
+        $this->scannedItems = [];
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleScan($data)
+    {
+        $code = $data['data'];
+        $format = $data['format'];
+
+        // Add to scanned items
+        $this->scannedItems[] = [
+            'code' => $code,
+            'format' => $format,
+            'time' => now(),
+        ];
+
+        // Provide feedback
+        session()->flash('message', 'Scanned: ' . $code);
+    }
+
+    public function completeInventory()
+    {
+        // Process all scanned items
+        foreach ($this->scannedItems as $item) {
+            InventoryItem::firstOrCreate(
+                ['code' => $item['code']],
+                ['scanned_at' => $item['time']]
+            );
+        }
+
+        $this->isScanning = false;
+        session()->flash('success', 'Inventory complete: ' . count($this->scannedItems) . ' items');
+    }
+
+    public function render()
+    {
+        return view('livewire.inventory-check');
+    }
+}
+```
+
+### QR Code Authentication
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Facades\Scanner;
+
+class QRLogin extends Component
+{
+    public function scanLoginCode()
+    {
+        Scanner::scan()
+            ->prompt('Scan QR code to log in')
+            ->formats(['qr']);
+    }
+
+    #[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+    public function handleScan($data)
+    {
+        $qrData = $data['data'];
+
+        try {
+            // Parse QR code data (e.g., JWT token, session ID)
+            $token = json_decode($qrData);
+
+            // Verify and authenticate
+            if ($this->verifyLoginToken($token)) {
+                return redirect()->route('dashboard');
+            }
+
+            session()->flash('error', 'Invalid QR code');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Could not process QR code');
+        }
+    }
+
+    private function verifyLoginToken($token): bool
+    {
+        // Implement your verification logic
+        return true;
+    }
+
+    public function render()
+    {
+        return view('livewire.qr-login');
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+- Uses AVFoundation for camera access
+- Requires camera permission in Info.plist:
+  ```xml
+  <key>NSCameraUsageDescription</key>
+  <string>We need camera access to scan barcodes</string>
+  ```
+- All barcode formats are supported
+- Provides visual feedback when code is detected
+
+### Android
+
+- Uses ML Kit Barcode Scanning
+- Requires camera permission in AndroidManifest.xml:
+  ```xml
+  <uses-permission android:name="android.permission.CAMERA" />
+  <uses-feature android:name="android.hardware.camera" />
+  ```
+- All barcode formats are supported
+- Provides haptic feedback when code is scanned
+
+## Best Practices
+
+1. **Use Clear Prompts**: Tell users exactly what they should scan
+
+```php
+Scanner::scan()->prompt('Scan the QR code on your ticket');
+```
+
+2. **Limit Formats**: Only scan the formats you need for better performance
+
+```php
+Scanner::scan()->formats(['qr']); // QR only
+```
+
+3. **Provide Feedback**: Show users what was scanned
+
+```php
+#[On('native:Native\\Mobile\\Events\\Scanner\\CodeScanned')]
+public function handleScan($data)
+{
+    session()->flash('message', 'Scanned: ' . $data['data']);
+}
+```
+
+4. **Handle Cancellation**: Always handle the `ScannerCancelled` event
+
+```php
+#[On('native:Native\\Mobile\\Events\\Scanner\\ScannerCancelled')]
+public function handleCancellation()
+{
+    $this->isScanning = false;
+}
+```
+
+5. **Use Continuous Mode Wisely**: Only use continuous scanning when you need to scan multiple items
+
+```php
+// Single item
+Scanner::scan();
+
+// Multiple items
+Scanner::scan()->continuous();
+```

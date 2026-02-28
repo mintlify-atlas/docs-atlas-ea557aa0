@@ -1,0 +1,210 @@
+---
+title: Biometrics
+description: Authenticate users with Face ID, Touch ID, or device biometrics
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Biometrics;
+```
+
+## Methods
+
+### prompt()
+
+Initiate a biometric authentication prompt using Face ID (iOS) or fingerprint/face unlock (Android).
+
+Returns a `PendingBiometric` instance for fluent API configuration.
+
+```php
+$auth = Biometrics::prompt();
+```
+
+<ResponseField name="return" type="PendingBiometric">
+  A pending biometric authentication instance
+</ResponseField>
+
+## PendingBiometric Methods
+
+The `PendingBiometric` class provides a fluent interface for configuring biometric authentication.
+
+### id()
+
+Set a unique identifier for this biometric authentication to correlate with events.
+
+<ParamField path="id" type="string" required>
+  Unique identifier for tracking this authentication attempt
+</ParamField>
+
+```php
+Biometrics::prompt()
+    ->id('login-attempt-123');
+```
+
+### getId()
+
+Get the biometric authentication's unique identifier (generates one if not set).
+
+```php
+$pending = Biometrics::prompt();
+$id = $pending->getId();
+```
+
+<ResponseField name="return" type="string">
+  The unique identifier (UUID if not manually set)
+</ResponseField>
+
+### event()
+
+Set a custom event class to dispatch when biometric authentication completes.
+
+<ParamField path="eventClass" type="string" required>
+  Fully qualified class name of the event to dispatch
+</ParamField>
+
+```php
+use App\Events\UserAuthenticated;
+
+Biometrics::prompt()
+    ->event(UserAuthenticated::class);
+```
+
+### remember()
+
+Store this biometric authentication's ID in the session for later retrieval.
+
+```php
+Biometrics::prompt()
+    ->id('auth-123')
+    ->remember();
+```
+
+### lastId()
+
+Retrieve the last remembered biometric authentication ID from the session.
+
+```php
+$lastId = \Native\Mobile\PendingBiometric::lastId();
+```
+
+<ResponseField name="return" type="string|null">
+  The last remembered authentication ID, or null if none exists
+</ResponseField>
+
+### prompt()
+
+Explicitly start the biometric authentication prompt.
+
+```php
+$success = Biometrics::prompt()
+    ->id('auth-123')
+    ->prompt();
+```
+
+<ResponseField name="return" type="bool">
+  True if the prompt was successfully initiated, false otherwise
+</ResponseField>
+
+## Events
+
+Biometric authentication results are delivered via events.
+
+### Completed
+
+Dispatched when biometric authentication completes (success or failure).
+
+```php
+use Native\Mobile\Events\Biometric\Completed;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(Completed::class, function (Completed $event) {
+    if ($event->success) {
+        // User authenticated successfully
+        $id = $event->id;
+    } else {
+        // Authentication failed
+    }
+});
+```
+
+**Event Properties:**
+- `success` (bool) - Whether authentication succeeded
+- `id` (string|null) - The tracking ID if one was set
+
+## Examples
+
+### Basic Authentication
+
+```php
+use Native\Mobile\Facades\Biometrics;
+
+// Simple authentication prompt
+Biometrics::prompt();
+```
+
+### Tracked Authentication with Event Handling
+
+```php
+use Native\Mobile\Facades\Biometrics;
+use Native\Mobile\Events\Biometric\Completed;
+use Illuminate\Support\Facades\Event;
+
+// In your controller or component
+Biometrics::prompt()
+    ->id('login-' . auth()->id())
+    ->remember();
+
+// In your event listener
+Event::listen(Completed::class, function (Completed $event) {
+    $userId = str_replace('login-', '', $event->id);
+    
+    if ($event->success) {
+        Log::info("User {$userId} authenticated successfully");
+        // Complete login process
+    } else {
+        Log::warning("User {$userId} failed biometric authentication");
+    }
+});
+```
+
+### Custom Event
+
+```php
+use Native\Mobile\Facades\Biometrics;
+use App\Events\BiometricLoginAttempt;
+
+Biometrics::prompt()
+    ->event(BiometricLoginAttempt::class)
+    ->id('session-' . session()->getId());
+```
+
+### Livewire Integration
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Biometrics;
+use Native\Mobile\Events\Biometric\Completed;
+use Livewire\Attributes\On;
+
+class LoginForm extends Component
+{
+    public function authenticateWithBiometrics()
+    {
+        Biometrics::prompt()
+            ->id('livewire-auth')
+            ->remember();
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Biometric\\Completed')]
+    public function handleBiometricResult($data)
+    {
+        if ($data['success']) {
+            auth()->login($this->user);
+            return redirect()->route('dashboard');
+        }
+        
+        $this->addError('auth', 'Biometric authentication failed');
+    }
+}
+```

@@ -1,0 +1,128 @@
+---
+title: UI Components Overview
+description: Build native mobile interfaces using Blade components in NativePHP Mobile
+---
+
+NativePHP Mobile provides a comprehensive set of native UI components that render platform-native interfaces on iOS and Android. These components are seamlessly integrated into Laravel's Blade templating system, allowing you to build mobile UIs using familiar syntax.
+
+## How Components Work
+
+Native UI components are automatically registered as Blade components with the `native-` prefix. The registration process (from NativeServiceProvider.php:330-372):
+
+1. Scans the `src/Edge/Components/` directory recursively
+2. Converts class names to kebab-case (e.g., `BottomNav` → `bottom-nav`)
+3. Registers each as a Blade component with the `native-` prefix
+4. Results in components like `<x-native-bottom-nav>`, `<x-native-top-bar>`, etc.
+
+## Basic Usage Pattern
+
+All native components extend the `EdgeComponent` base class and follow a consistent pattern:
+
+```blade
+<x-native-component-name 
+    :prop="$value"
+    prop="static-value"
+>
+    <!-- Child components if supported -->
+</x-native-component-name>
+```
+
+### Component Features
+
+- **Type Safety**: Components validate required props at render time
+- **Native Rendering**: Props are converted to platform-native configurations
+- **Child Support**: Container components (like `bottom-nav`, `side-nav`, `top-bar`) can contain child items
+- **Blade Integration**: Full support for Blade syntax, variables, and directives
+
+## Available Components
+
+### Navigation Components
+
+<CardGroup cols={2}>
+  <Card title="Bottom Navigation" icon="bars" href="/components/bottom-navigation">
+    Bottom navigation bar with tabs for primary app destinations
+  </Card>
+  
+  <Card title="Side Navigation" icon="sidebar" href="/components/overview">
+    Drawer-style navigation that slides in from the side
+  </Card>
+  
+  <Card title="Top Bar" icon="heading" href="/components/overview">
+    App bar with title, subtitle, and action buttons
+  </Card>
+  
+  <Card title="Floating Action Button" icon="circle-plus" href="/components/overview">
+    Prominent circular button for primary actions
+  </Card>
+</CardGroup>
+
+### Component Hierarchy
+
+Many navigation components work together in parent-child relationships:
+
+**Bottom Navigation**
+- `<x-native-bottom-nav>` (parent)
+  - `<x-native-bottom-nav-item>` (children)
+
+**Side Navigation**
+- `<x-native-side-nav>` (parent)
+  - `<x-native-side-nav-header>` (optional header)
+  - `<x-native-side-nav-item>` (direct items)
+  - `<x-native-side-nav-group>` (collapsible groups)
+    - `<x-native-side-nav-item>` (nested items)
+  - `<x-native-horizontal-divider>` (visual separator)
+
+**Top Bar**
+- `<x-native-top-bar>` (parent)
+  - `<x-native-top-bar-action>` (action buttons)
+
+## Component Registration Details
+
+The component registration happens automatically when NativePHP Mobile boots. From the source code:
+
+```php
+// Convert BottomNav -> bottom-nav
+$kebabName = ltrim(strtolower(preg_replace('/[A-Z]/', '-$0', $className)), '-');
+
+// Register as Blade component
+Blade::component("native-{$kebabName}", $componentClass);
+```
+
+This means:
+- `BottomNav.php` → `<x-native-bottom-nav>`
+- `SideNavItem.php` → `<x-native-side-nav-item>`
+- `TopBarAction.php` → `<x-native-top-bar-action>`
+
+## Validation and Error Handling
+
+Components automatically validate required props. If you forget a required prop, you'll get a clear error message:
+
+```php
+// From EdgeComponent.php - validateProps() method
+protected function requiredProps(): array
+{
+    return ['id', 'icon', 'url', 'label'];
+}
+```
+
+Attempting to render a component without required props will throw a `MissingRequiredPropsException` with details about which props are missing.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bottom Navigation" icon="bars" href="/components/bottom-navigation">
+    Learn how to create tabbed navigation
+  </Card>
+  
+  <Card title="Side Navigation" icon="sidebar" href="/components/overview">
+    Build drawer-style navigation menus
+  </Card>
+  
+  <Card title="Top Bar" icon="heading" href="/components/overview">
+    Add app bars with titles and actions
+  </Card>
+  
+  <Card title="FAB" icon="circle-plus" href="/components/overview">
+    Implement floating action buttons
+  </Card>
+</CardGroup>

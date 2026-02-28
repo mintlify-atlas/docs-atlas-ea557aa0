@@ -1,0 +1,284 @@
+---
+title: Bottom Navigation
+description: Create native bottom tab navigation for primary app destinations
+---
+
+The bottom navigation component provides a material design bottom navigation bar with tabs for switching between primary app destinations. It's ideal for apps with 3-5 top-level sections.
+
+## Components
+
+Bottom navigation requires two components working together:
+
+- `<x-native-bottom-nav>` - The container that holds navigation items
+- `<x-native-bottom-nav-item>` - Individual navigation tabs
+
+## Basic Usage
+
+```blade
+<x-native-bottom-nav>
+    <x-native-bottom-nav-item
+        id="home"
+        icon="home"
+        label="Home"
+        url="/"
+        :active="true"
+    />
+    
+    <x-native-bottom-nav-item
+        id="explore"
+        icon="compass"
+        label="Explore"
+        url="/explore"
+    />
+    
+    <x-native-bottom-nav-item
+        id="profile"
+        icon="person"
+        label="Profile"
+        url="/profile"
+    />
+</x-native-bottom-nav>
+```
+
+## BottomNav Props
+
+The `<x-native-bottom-nav>` container accepts the following props:
+
+<ParamField path="dark" type="boolean" default="null">
+  Enable dark theme for the navigation bar. When `null`, uses system theme.
+</ParamField>
+
+<ParamField path="labelVisibility" type="string" default="labeled">
+  Controls when labels are shown. Options:
+  - `labeled` - Always show labels
+  - `selected` - Show label only for active item
+  - `unlabeled` - Never show labels
+</ParamField>
+
+<ParamField path="activeColor" type="string" default="null">
+  Custom color for the active tab (hex color or platform color name)
+</ParamField>
+
+## BottomNavItem Props
+
+Each `<x-native-bottom-nav-item>` represents a tab and requires these props:
+
+<ParamField path="id" type="string" required>
+  Unique identifier for this navigation item
+</ParamField>
+
+<ParamField path="icon" type="string" required>
+  Material icon name (e.g., `home`, `search`, `person`)
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  Route or URL to navigate to when tapped
+</ParamField>
+
+<ParamField path="label" type="string" required>
+  Text label displayed for this tab
+</ParamField>
+
+<ParamField path="active" type="boolean" default="false">
+  Whether this tab is currently active
+</ParamField>
+
+<ParamField path="badge" type="string" default="null">
+  Badge text to display (e.g., notification count)
+</ParamField>
+
+<ParamField path="badgeColor" type="string" default="null">
+  Custom badge background color
+</ParamField>
+
+<ParamField path="news" type="boolean" default="false">
+  Show a small dot indicator for new content
+</ParamField>
+
+## Complete Example
+
+Here's a full example showing all features:
+
+```blade
+<x-native-bottom-nav
+    :dark="false"
+    labelVisibility="labeled"
+    activeColor="#6366f1"
+>
+    <x-native-bottom-nav-item
+        id="home"
+        icon="home"
+        label="Home"
+        url="/"
+        :active="request()->is('/')"
+    />
+    
+    <x-native-bottom-nav-item
+        id="messages"
+        icon="mail"
+        label="Messages"
+        url="/messages"
+        :active="request()->is('messages*')"
+        badge="{{ $unreadCount }}"
+        badgeColor="#ef4444"
+    />
+    
+    <x-native-bottom-nav-item
+        id="notifications"
+        icon="notifications"
+        label="Notifications"
+        url="/notifications"
+        :active="request()->is('notifications*')"
+        :news="$hasNewNotifications"
+    />
+    
+    <x-native-bottom-nav-item
+        id="settings"
+        icon="settings"
+        label="Settings"
+        url="/settings"
+        :active="request()->is('settings*')"
+    />
+</x-native-bottom-nav>
+```
+
+## Dynamic Active State
+
+You can dynamically set the active tab based on the current route:
+
+```blade
+<x-native-bottom-nav>
+    @foreach ($navItems as $item)
+        <x-native-bottom-nav-item
+            :id="$item['id']"
+            :icon="$item['icon']"
+            :label="$item['label']"
+            :url="$item['url']"
+            :active="request()->is($item['route'])"
+        />
+    @endforeach
+</x-native-bottom-nav>
+```
+
+With a controller:
+
+```php
+public function index()
+{
+    $navItems = [
+        ['id' => 'home', 'icon' => 'home', 'label' => 'Home', 'url' => '/', 'route' => '/'],
+        ['id' => 'explore', 'icon' => 'explore', 'label' => 'Explore', 'url' => '/explore', 'route' => 'explore*'],
+        ['id' => 'favorites', 'icon' => 'favorite', 'label' => 'Favorites', 'url' => '/favorites', 'route' => 'favorites*'],
+        ['id' => 'profile', 'icon' => 'person', 'label' => 'Profile', 'url' => '/profile', 'route' => 'profile*'],
+    ];
+    
+    return view('home', compact('navItems'));
+}
+```
+
+## Label Visibility Options
+
+```blade
+<!-- Always show labels (default) -->
+<x-native-bottom-nav labelVisibility="labeled">
+    <!-- items -->
+</x-native-bottom-nav>
+
+<!-- Show label only for selected tab -->
+<x-native-bottom-nav labelVisibility="selected">
+    <!-- items -->
+</x-native-bottom-nav>
+
+<!-- Never show labels (icons only) -->
+<x-native-bottom-nav labelVisibility="unlabeled">
+    <!-- items -->
+</x-native-bottom-nav>
+```
+
+## Badges and Indicators
+
+```blade
+<!-- Numeric badge -->
+<x-native-bottom-nav-item
+    id="messages"
+    icon="mail"
+    label="Messages"
+    url="/messages"
+    badge="5"
+/>
+
+<!-- Custom badge color -->
+<x-native-bottom-nav-item
+    id="alerts"
+    icon="warning"
+    label="Alerts"
+    url="/alerts"
+    badge="!"
+    badgeColor="#f59e0b"
+/>
+
+<!-- News indicator (small dot) -->
+<x-native-bottom-nav-item
+    id="updates"
+    icon="notifications"
+    label="Updates"
+    url="/updates"
+    :news="true"
+/>
+```
+
+## Theming
+
+```blade
+<!-- Dark theme -->
+<x-native-bottom-nav :dark="true">
+    <!-- items -->
+</x-native-bottom-nav>
+
+<!-- Light theme -->
+<x-native-bottom-nav :dark="false">
+    <!-- items -->
+</x-native-bottom-nav>
+
+<!-- System theme (default) -->
+<x-native-bottom-nav>
+    <!-- items -->
+</x-native-bottom-nav>
+
+<!-- Custom active color -->
+<x-native-bottom-nav activeColor="#10b981">
+    <!-- items -->
+</x-native-bottom-nav>
+```
+
+## Best Practices
+
+<Warning>
+  Bottom navigation works best with 3-5 destinations. For more items, consider using side navigation instead.
+</Warning>
+
+<Tip>
+  Use clear, concise labels (1-2 words max) for better mobile UX.
+</Tip>
+
+<Info>
+  The `id` prop must be unique across all bottom nav items in the same navigation bar.
+</Info>
+
+## Source Reference
+
+The bottom navigation components are defined in:
+- `src/Edge/Components/Navigation/BottomNav.php:1-29` - Container component
+- `src/Edge/Components/Navigation/BottomNavItem.php:1-41` - Item component
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="Side Navigation" icon="sidebar" href="/components/overview">
+    Alternative navigation pattern for more items
+  </Card>
+  
+  <Card title="Top Bar" icon="heading" href="/components/overview">
+    Combine with a top bar for complete navigation
+  </Card>
+</CardGroup>

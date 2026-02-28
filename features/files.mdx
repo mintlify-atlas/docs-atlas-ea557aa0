@@ -1,0 +1,384 @@
+---
+title: Files
+description: Move and copy files within the app's file system.
+---
+
+The Files API provides methods to move and copy files within your application's file system, useful for organizing media, managing downloads, and handling user-generated content.
+
+## Usage
+
+Move a file to a new location:
+
+```php
+use Native\Mobile\Facades\File;
+
+File::move('/path/to/source.jpg', '/path/to/destination.jpg');
+```
+
+## Methods
+
+### `move(string $from, string $to)`
+
+Move a file from one location to another.
+
+**Parameters:**
+- `$from` (string) - Source file path
+- `$to` (string) - Destination file path
+
+**Returns:** `bool` - True if the file was moved successfully
+
+**Example:**
+```php
+$success = File::move(
+    '/tmp/photo.jpg',
+    '/storage/photos/photo.jpg'
+);
+
+if ($success) {
+    echo 'File moved successfully';
+}
+```
+
+<Note>
+If a file already exists at the destination path, it will be overwritten. The source file is removed after a successful move.
+</Note>
+
+### `copy(string $from, string $to)`
+
+Copy a file from one location to another.
+
+**Parameters:**
+- `$from` (string) - Source file path
+- `$to` (string) - Destination file path
+
+**Returns:** `bool` - True if the file was copied successfully
+
+**Example:**
+```php
+$success = File::copy(
+    '/storage/original.pdf',
+    '/storage/backup/original.pdf'
+);
+
+if ($success) {
+    echo 'File copied successfully';
+}
+```
+
+<Note>
+The source file remains unchanged. If a file already exists at the destination, it will be overwritten.
+</Note>
+
+## Examples
+
+### Organizing Uploaded Photos
+
+```php
+use Native\Mobile\Facades\File;
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+class PhotoOrganizer
+{
+    public function handle(PhotoTaken $event)
+    {
+        // Photos are initially in temp directory
+        $tempPath = $event->path;
+        
+        // Organize by date
+        $date = now()->format('Y-m-d');
+        $filename = basename($tempPath);
+        $permanentPath = "/storage/photos/{$date}/{$filename}";
+        
+        // Create directory structure if needed
+        $directory = dirname($permanentPath);
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+        
+        // Move from temp to permanent storage
+        $success = File::move($tempPath, $permanentPath);
+        
+        if ($success) {
+            // Save to database
+            Photo::create([
+                'path' => $permanentPath,
+                'date' => $date,
+                'user_id' => auth()->id(),
+            ]);
+        }
+    }
+}
+```
+
+### Creating Backup Copies
+
+```php
+use Native\Mobile\Facades\File;
+
+class BackupService
+{
+    public function backupUserFiles(User $user)
+    {
+        $files = $user->files;
+        $backupDir = "/storage/backups/{$user->id}/" . now()->format('Y-m-d');
+        
+        mkdir($backupDir, 0755, true);
+        
+        foreach ($files as $file) {
+            $filename = basename($file->path);
+            $backupPath = "{$backupDir}/{$filename}";
+            
+            $success = File::copy($file->path, $backupPath);
+            
+            if ($success) {
+                Log::info("Backed up: {$file->path}");
+            } else {
+                Log::error("Failed to backup: {$file->path}");
+            }
+        }
+    }
+}
+```
+
+### Managing Download Files
+
+```php
+use Native\Mobile\Facades\File;
+use Illuminate\Support\Facades\Http;
+
+class DownloadManager
+{
+    public function downloadAndStore(string $url, string $filename)
+    {
+        // Download to temp location
+        $tempPath = "/tmp/{$filename}";
+        $response = Http::sink($tempPath)->get($url);
+        
+        if ($response->successful()) {
+            // Move to permanent storage
+            $storagePath = "/storage/downloads/{$filename}";
+            $moved = File::move($tempPath, $storagePath);
+            
+            if ($moved) {
+                return [
+                    'success' => true,
+                    'path' => $storagePath,
+                ];
+            }
+        }
+        
+        return ['success' => false];
+    }
+}
+```
+
+### Image Processing Pipeline
+
+```php
+use Native\Mobile\Facades\File;
+use Intervention\Image\Facades\Image;
+
+class ImageProcessor
+{
+    public function processAndSave(string $sourcePath)
+    {
+        // Create a working copy
+        $workingPath = "/tmp/processing_" . basename($sourcePath);
+        File::copy($sourcePath, $workingPath);
+        
+        // Process the working copy
+        $image = Image::make($workingPath)
+            ->resize(800, 600)
+            ->sharpen(10);
+        
+        $image->save($workingPath);
+        
+        // Move processed image to final location
+        $finalPath = "/storage/processed/" . basename($sourcePath);
+        File::move($workingPath, $finalPath);
+        
+        return $finalPath;
+    }
+}
+```
+
+### File Versioning
+
+```php
+use Native\Mobile\Facades\File;
+
+class FileVersioning
+{
+    public function saveVersion(string $filePath)
+    {
+        $directory = dirname($filePath);
+        $filename = basename($filePath);
+        $versionsDir = "{$directory}/.versions";
+        
+        // Create versions directory
+        if (!is_dir($versionsDir)) {
+            mkdir($versionsDir, 0755, true);
+        }
+        
+        // Create timestamped version
+        $timestamp = now()->format('YmdHis');
+        $versionPath = "{$versionsDir}/{$timestamp}_{$filename}";
+        
+        // Copy current version
+        $success = File::copy($filePath, $versionPath);
+        
+        if ($success) {
+            // Cleanup old versions (keep last 5)
+            $this->cleanupOldVersions($versionsDir, 5);
+        }
+        
+        return $success;
+    }
+    
+    private function cleanupOldVersions(string $directory, int $keep)
+    {
+        $files = glob("{$directory}/*");
+        usort($files, fn($a, $b) => filemtime($b) - filemtime($a));
+        
+        $toDelete = array_slice($files, $keep);
+        
+        foreach ($toDelete as $file) {
+            unlink($file);
+        }
+    }
+}
+```
+
+### Temporary File Cleanup
+
+```php
+use Native\Mobile\Facades\File;
+
+class TempFileCleaner
+{
+    public function cleanupTempFiles()
+    {
+        $tempDir = '/tmp';
+        $archiveDir = '/storage/archive';
+        
+        $files = glob("{$tempDir}/*");
+        $cutoffTime = now()->subHours(24)->timestamp;
+        
+        foreach ($files as $filePath) {
+            if (filemtime($filePath) < $cutoffTime) {
+                // Archive before deleting
+                $filename = basename($filePath);
+                $archivePath = "{$archiveDir}/{$filename}";
+                
+                File::move($filePath, $archivePath);
+                
+                Log::info("Archived temp file: {$filename}");
+            }
+        }
+    }
+}
+```
+
+### Multi-Format Export
+
+```php
+use Native\Mobile\Facades\File;
+
+class DocumentExporter
+{
+    public function exportToFormats(Document $document)
+    {
+        $basePath = $document->file_path;
+        $formats = ['pdf', 'docx', 'txt'];
+        $exportDir = "/storage/exports/{$document->id}";
+        
+        mkdir($exportDir, 0755, true);
+        
+        $exports = [];
+        
+        foreach ($formats as $format) {
+            $exportPath = "{$exportDir}/document.{$format}";
+            
+            // Convert document (simplified example)
+            $this->convertToFormat($basePath, $exportPath, $format);
+            
+            $exports[$format] = $exportPath;
+        }
+        
+        return $exports;
+    }
+}
+```
+
+### Safe File Replacement
+
+```php
+use Native\Mobile\Facades\File;
+
+class SafeFileReplacer
+{
+    public function replaceFile(string $filePath, string $newContent)
+    {
+        // Write new content to temporary file
+        $tempPath = "{$filePath}.tmp";
+        file_put_contents($tempPath, $newContent);
+        
+        // Verify the new file
+        if (filesize($tempPath) === 0) {
+            unlink($tempPath);
+            throw new \Exception('New file is empty');
+        }
+        
+        // Create backup of original
+        $backupPath = "{$filePath}.backup";
+        File::copy($filePath, $backupPath);
+        
+        // Replace original with new file
+        $success = File::move($tempPath, $filePath);
+        
+        if ($success) {
+            // Remove backup after successful replacement
+            unlink($backupPath);
+            return true;
+        } else {
+            // Restore from backup if replacement failed
+            File::move($backupPath, $filePath);
+            return false;
+        }
+    }
+}
+```
+
+## Platform Notes
+
+### iOS
+
+- File operations use `FileManager` API
+- App has access to its own sandbox directories:
+  - Documents: `/Documents/` (backed up to iCloud)
+  - Temp: `/tmp/` (cleared by system)
+  - Cache: `/Library/Caches/` (not backed up)
+- Cross-directory moves are atomic when on same volume
+- File permissions managed by the system
+
+### Android
+
+- File operations use Java `File` API
+- App has access to:
+  - Internal storage: `/data/data/[package]/`
+  - Cache: `/data/data/[package]/cache/`
+  - External storage (if permission granted)
+- Moves within same filesystem are atomic
+- Cross-filesystem moves require copy + delete
+
+<Warning>
+Always check the return value to ensure the operation succeeded. File operations can fail due to insufficient permissions, disk space, or invalid paths.
+</Warning>
+
+<Note>
+Both `move()` and `copy()` will overwrite existing files at the destination without warning. If you need to preserve existing files, check for their existence first using standard PHP file functions.
+</Note>
+
+<Note>
+File paths should use the platform's native path format. On both iOS and Android, forward slashes (`/`) are supported and recommended for cross-platform compatibility.
+</Note>

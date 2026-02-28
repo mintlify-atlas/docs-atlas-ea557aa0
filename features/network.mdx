@@ -1,0 +1,292 @@
+---
+title: Network
+description: Monitor network connectivity and connection type
+---
+
+The Network API allows you to check the device's current network connectivity status and connection type. This is useful for determining whether to perform network operations or showing offline indicators.
+
+## Usage
+
+Check the current network status:
+
+```php
+use Native\Mobile\Facades\Network;
+
+$status = Network::status();
+
+if ($status->connected) {
+    // Device is connected to a network
+    $type = $status->type; // wifi, cellular, ethernet, unknown
+}
+```
+
+## Network Status Object
+
+The `status()` method returns an object with the following properties:
+
+```php
+$status = Network::status();
+
+// Available on all platforms
+$status->connected;  // bool - Whether device is connected to a network
+$status->type;       // string - Connection type
+
+// iOS only
+$status->isExpensive;   // bool - Whether connection is metered/cellular
+$status->isConstrained; // bool - Whether Low Data Mode is enabled
+```
+
+### Connection Types
+
+The `type` property can be one of the following values:
+
+- `wifi` - Connected via Wi-Fi
+- `cellular` - Connected via cellular data (3G, 4G, 5G, etc.)
+- `ethernet` - Connected via Ethernet (rare on mobile, but possible)
+- `unknown` - Connected but type cannot be determined
+
+## Examples
+
+### Basic Connectivity Check
+
+```php
+use Native\Mobile\Facades\Network;
+
+public function syncData()
+{
+    $status = Network::status();
+
+    if (!$status || !$status->connected) {
+        return back()->with('error', 'No network connection available');
+    }
+
+    // Proceed with network operation
+    $this->performSync();
+}
+```
+
+### Connection Type Check
+
+```php
+use Native\Mobile\Facades\Network;
+
+public function downloadLargeFile()
+{
+    $status = Network::status();
+
+    if ($status->type === 'cellular') {
+        // Warn user about cellular data usage
+        return $this->confirmCellularDownload();
+    }
+
+    // Safe to download on Wi-Fi
+    $this->startDownload();
+}
+```
+
+### Check for Expensive Connections (iOS)
+
+```php
+use Native\Mobile\Facades\Network;
+
+public function shouldAutoSync(): bool
+{
+    $status = Network::status();
+
+    if (!$status || !$status->connected) {
+        return false;
+    }
+
+    // On iOS, check if connection is expensive (cellular or metered)
+    if (isset($status->isExpensive) && $status->isExpensive) {
+        return false; // Don't auto-sync on cellular
+    }
+
+    return true;
+}
+```
+
+### Respect Low Data Mode (iOS)
+
+```php
+use Native\Mobile\Facades\Network;
+
+public function getImageQuality(): string
+{
+    $status = Network::status();
+
+    // On iOS, check if Low Data Mode is enabled
+    if (isset($status->isConstrained) && $status->isConstrained) {
+        return 'low'; // Use compressed images
+    }
+
+    if ($status->type === 'cellular') {
+        return 'medium';
+    }
+
+    return 'high'; // Full quality on Wi-Fi
+}
+```
+
+### Livewire Component Example
+
+```php
+use Livewire\Component;
+use Native\Mobile\Facades\Network;
+
+class NetworkStatus extends Component
+{
+    public $isOnline = false;
+    public $connectionType = 'unknown';
+    public $isExpensive = false;
+
+    public function mount()
+    {
+        $this->checkNetwork();
+    }
+
+    public function checkNetwork()
+    {
+        $status = Network::status();
+
+        if ($status) {
+            $this->isOnline = $status->connected;
+            $this->connectionType = $status->type;
+            $this->isExpensive = $status->isExpensive ?? false;
+        } else {
+            $this->isOnline = false;
+            $this->connectionType = 'unknown';
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.network-status');
+    }
+}
+```
+
+## Methods Reference
+
+### `status()`
+
+Returns the current network connectivity status.
+
+**Returns:** `object|null`
+
+**Object Properties:**
+- `connected` (bool) - Whether the device is connected to a network
+- `type` (string) - Connection type: `"wifi"`, `"cellular"`, `"ethernet"`, or `"unknown"`
+- `isExpensive` (bool, iOS only) - Whether the connection is metered or cellular
+- `isConstrained` (bool, iOS only) - Whether Low Data Mode is enabled
+
+**Returns `null` if:**
+- The native bridge is not available
+- Network status cannot be determined
+
+```php
+$status = Network::status();
+
+if ($status && $status->connected) {
+    // Device is online
+}
+```
+
+## Platform Notes
+
+### iOS
+
+On iOS, the Network API provides additional properties:
+
+- **`isExpensive`**: Indicates whether the current connection is considered "expensive" by the system. This includes cellular connections and metered Wi-Fi networks. Use this to avoid heavy network operations when users might be charged for data.
+
+- **`isConstrained`**: Indicates whether Low Data Mode is enabled in system settings. When enabled, users have explicitly requested apps to minimize data usage. Respect this setting by:
+  - Reducing image quality
+  - Disabling auto-play videos
+  - Deferring non-essential downloads
+  - Using cached content when possible
+
+```php
+$status = Network::status();
+
+if ($status->isConstrained) {
+    // User has Low Data Mode enabled - minimize data usage
+}
+```
+
+### Android
+
+On Android, the Network API provides the basic connectivity information:
+
+- `connected` - Whether the device has network connectivity
+- `type` - The type of network connection
+
+The `isExpensive` and `isConstrained` properties are iOS-specific and will not be present in the response on Android. Always check for their existence before using:
+
+```php
+$status = Network::status();
+
+if (isset($status->isExpensive) && $status->isExpensive) {
+    // iOS-specific check
+}
+```
+
+## Best Practices
+
+### Always Check for Null
+
+```php
+$status = Network::status();
+
+if (!$status) {
+    // Cannot determine network status
+    // Handle gracefully
+}
+```
+
+### Use Type Checking
+
+```php
+$status = Network::status();
+
+if ($status && $status->connected && $status->type === 'wifi') {
+    // Safe to perform bandwidth-intensive operations
+}
+```
+
+### Respect User Preferences
+
+```php
+$status = Network::status();
+
+// Check for iOS Low Data Mode
+if (isset($status->isConstrained) && $status->isConstrained) {
+    // Minimize data usage
+}
+
+// Check for cellular connection
+if ($status->type === 'cellular') {
+    // Consider asking user before large downloads
+}
+```
+
+### Cache Network Status
+
+Avoid calling `status()` repeatedly. Cache the result when appropriate:
+
+```php
+class MyComponent extends Component
+{
+    public $networkStatus;
+
+    public function mount()
+    {
+        $this->networkStatus = Network::status();
+    }
+
+    public function refreshNetworkStatus()
+    {
+        $this->networkStatus = Network::status();
+    }
+}
+```

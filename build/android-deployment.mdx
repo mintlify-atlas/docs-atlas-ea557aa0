@@ -1,0 +1,554 @@
+---
+title: Android Deployment
+description: Deploy your NativePHP app to Google Play Store
+---
+
+## Overview
+
+Deploying an Android app to Google Play involves creating a signed App Bundle (AAB), configuring your app listing, and uploading to the Play Console. NativePHP automates the build and signing process.
+
+## Prerequisites
+
+<AccordionGroup>
+  <Accordion title="Google Play Developer Account">
+    A Google Play Developer account is required ($25 one-time fee).
+  </Accordion>
+  
+  <Accordion title="App Created in Play Console">
+    Create your app in Google Play Console with the same package name as your `NATIVEPHP_APP_ID`.
+  </Accordion>
+  
+  <Accordion title="Signing Keystore">
+    Generate a keystore file for signing your app releases.
+  </Accordion>
+  
+  <Accordion title="Google Service Account (Optional)">
+    For automated uploads, create a service account with Play Console access.
+  </Accordion>
+</AccordionGroup>
+
+## Keystore Generation
+
+Generate a signing keystore for your app:
+
+```bash
+keytool -genkey -v -keystore my-release-key.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias my-key-alias
+```
+
+You'll be prompted for:
+- Keystore password
+- Key password
+- Your name and organization details
+
+<Warning>
+**Keep your keystore safe!** If you lose it, you cannot update your app on Play Store. Back it up securely.
+</Warning>
+
+**Best Practices:**
+- Store keystore outside your project repository
+- Use a strong password (16+ characters)
+- Back up to secure cloud storage
+- Never commit keystore to version control
+
+## Version Configuration
+
+Android apps use two version identifiers:
+
+### Version Name
+
+Human-readable version displayed to users:
+
+```php
+// config/nativephp.php
+'version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+```
+
+```bash
+# .env
+NATIVEPHP_APP_VERSION=1.0.0
+```
+
+This maps to `versionName` in your app's build configuration.
+
+### Version Code
+
+Internal integer version that must increase with each release:
+
+```php
+// config/nativephp.php
+'version_code' => env('NATIVEPHP_APP_VERSION_CODE', 1),
+```
+
+```bash
+# .env
+NATIVEPHP_APP_VERSION_CODE=1
+```
+
+This maps to `versionCode` in your app's build configuration.
+
+**Version Code Rules:**
+- Must be a positive integer
+- Must increase with every Play Store release
+- Cannot be reused or decreased
+- Automatically incremented during packaging
+
+**Example Version Progression:**
+
+| Release | Version Name | Version Code |
+|---------|--------------|-------------|
+| Initial | 1.0.0 | 1 |
+| Bug fix | 1.0.1 | 2 |
+| Feature | 1.1.0 | 3 |
+| Major | 2.0.0 | 4 |
+
+## Building for Play Store
+
+### Create App Bundle
+
+Build a signed App Bundle (AAB) for Play Store:
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --keystore=/path/to/my-release-key.jks \
+  --keystore-password=keystorepass \
+  --key-alias=my-key-alias \
+  --key-password=keypass
+```
+
+### Using Environment Variables
+
+Store credentials securely in `.env`:
+
+```bash
+ANDROID_KEYSTORE_FILE=/path/to/my-release-key.jks
+ANDROID_KEYSTORE_PASSWORD=your_keystore_password
+ANDROID_KEY_ALIAS=my-key-alias
+ANDROID_KEY_PASSWORD=your_key_password
+```
+
+Then simply run:
+
+```bash
+php artisan native:package android --build-type=bundle
+```
+
+### Build Output
+
+After successful build:
+
+```
+Build output: nativephp/android/app/build/outputs/bundle/release/app-release.aab
+File size: 18.3 MB
+```
+
+The output directory will open automatically.
+
+## Automated Play Store Upload
+
+### Service Account Setup
+
+<Steps>
+  <Step title="Create Service Account">
+    In Google Cloud Console, create a service account for your project.
+  </Step>
+  
+  <Step title="Generate Key">
+    Create and download a JSON key for the service account.
+  </Step>
+  
+  <Step title="Grant Play Console Access">
+    In Play Console, go to **Users and Permissions** > **Invite new users** and add the service account email with **Release Manager** role.
+  </Step>
+  
+  <Step title="Configure Environment">
+    Add the service account key path to your `.env`:
+    
+    ```bash
+    GOOGLE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
+    ```
+  </Step>
+</Steps>
+
+### Upload to Play Store
+
+Build and upload in one command:
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --upload-to-play-store \
+  --play-store-track=internal
+```
+
+With Google Service Account:
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --upload-to-play-store \
+  --google-service-key=/path/to/service-account.json \
+  --play-store-track=internal
+```
+
+### Play Store Tracks
+
+Choose which track to publish to:
+
+```bash
+# Internal testing (fast, no review)
+--play-store-track=internal
+
+# Closed alpha testing
+--play-store-track=alpha
+
+# Open beta testing
+--play-store-track=beta
+
+# Production release
+--play-store-track=production
+```
+
+**Track Comparison:**
+
+| Track | Review Required | User Limit | Rollout Speed |
+|-------|----------------|------------|---------------|
+| **Internal** | No | 100 | Immediate |
+| **Alpha** | No | Unlimited | Fast |
+| **Beta** | No | Unlimited | Fast |
+| **Production** | Yes | Unlimited | Staged/Full |
+
+### Test Upload
+
+Test uploading an existing AAB without rebuilding:
+
+```bash
+php artisan native:package android \
+  --test-push=/path/to/app-release.aab \
+  --google-service-key=/path/to/service-account.json \
+  --play-store-track=internal
+```
+
+## Build Configuration
+
+Configure Android build options in `config/nativephp.php`:
+
+```php
+'android' => [
+    'build' => [
+        // Code minification and obfuscation
+        'minify_enabled' => env('NATIVEPHP_ANDROID_MINIFY_ENABLED', false),
+        'shrink_resources' => env('NATIVEPHP_ANDROID_SHRINK_RESOURCES', false),
+        'obfuscate' => env('NATIVEPHP_ANDROID_OBFUSCATE', false),
+        
+        // Debug symbols
+        'debug_symbols' => env('NATIVEPHP_ANDROID_DEBUG_SYMBOLS', 'FULL'),
+        'generate_mapping_files' => env('NATIVEPHP_ANDROID_MAPPING_FILES', false),
+        'mapping_file_path' => env('NATIVEPHP_ANDROID_MAPPING_PATH', 'build/outputs/mapping/release/'),
+        
+        // ProGuard rules
+        'keep_line_numbers' => env('NATIVEPHP_ANDROID_KEEP_LINE_NUMBERS', false),
+        'keep_source_file' => env('NATIVEPHP_ANDROID_KEEP_SOURCE_FILE', false),
+        'custom_proguard_rules' => env('NATIVEPHP_ANDROID_CUSTOM_PROGUARD_RULES', []),
+        
+        // Build performance
+        'parallel_builds' => env('NATIVEPHP_ANDROID_PARALLEL_BUILDS', true),
+        'incremental_builds' => env('NATIVEPHP_ANDROID_INCREMENTAL_BUILDS', true),
+    ],
+],
+```
+
+### Minification and Obfuscation
+
+Reduce APK size and protect code:
+
+```bash
+# Enable R8 minification
+NATIVEPHP_ANDROID_MINIFY_ENABLED=true
+
+# Remove unused resources
+NATIVEPHP_ANDROID_SHRINK_RESOURCES=true
+
+# Obfuscate code
+NATIVEPHP_ANDROID_OBFUSCATE=true
+```
+
+<Warning>
+Minification and obfuscation can make debugging harder. Test thoroughly before enabling for production.
+</Warning>
+
+### Debug Symbols
+
+Control debug information in builds:
+
+```bash
+# Full debug symbols (default)
+NATIVEPHP_ANDROID_DEBUG_SYMBOLS=FULL
+
+# Line numbers only
+NATIVEPHP_ANDROID_DEBUG_SYMBOLS=LINE_NUMBERS_ONLY
+
+# No debug symbols
+NATIVEPHP_ANDROID_DEBUG_SYMBOLS=NONE
+```
+
+### Generate Mapping Files
+
+For deobfuscating crash reports:
+
+```bash
+NATIVEPHP_ANDROID_MAPPING_FILES=true
+NATIVEPHP_ANDROID_MAPPING_PATH=build/outputs/mapping/release/
+```
+
+Mapping files are needed to interpret ProGuard-obfuscated stack traces.
+
+## Firebase Configuration (Optional)
+
+For push notifications or analytics:
+
+<Steps>
+  <Step title="Download google-services.json">
+    Get your Firebase configuration file from the Firebase Console.
+  </Step>
+  
+  <Step title="Place in Project">
+    Save it to either:
+    - `nativephp/resources/google-services.json` (recommended)
+    - `google-services.json` (project root)
+  </Step>
+  
+  <Step title="Rebuild">
+    The file is automatically copied during build:
+    
+    ```bash
+    php artisan native:package android --build-type=bundle
+    ```
+  </Step>
+</Steps>
+
+The `google-services.json` file is automatically included in your Android build.
+
+## Manual Play Store Submission
+
+If not using automated uploads:
+
+<Steps>
+  <Step title="Build AAB">
+    Create your signed App Bundle:
+    
+    ```bash
+    php artisan native:package android --build-type=bundle
+    ```
+  </Step>
+  
+  <Step title="Open Play Console">
+    Navigate to your app in [Google Play Console](https://play.google.com/console).
+  </Step>
+  
+  <Step title="Create Release">
+    Go to **Release** > **Production** (or Testing track) > **Create new release**.
+  </Step>
+  
+  <Step title="Upload AAB">
+    Drag and drop your `app-release.aab` file or browse to select it.
+  </Step>
+  
+  <Step title="Complete Release Notes">
+    Add release notes describing what's new or changed.
+  </Step>
+  
+  <Step title="Review and Rollout">
+    Review the release details and click **Start rollout to Production**.
+  </Step>
+</Steps>
+
+## App Signing by Google Play
+
+Google Play uses App Signing to manage your signing keys:
+
+<Steps>
+  <Step title="Enroll in App Signing">
+    When creating a new app, Google Play will prompt you to enroll in App Signing.
+  </Step>
+  
+  <Step title="Upload Signing Key">
+    Google will either:
+    - Generate a new signing key for you (recommended for new apps)
+    - Accept your existing key for migration
+  </Step>
+  
+  <Step title="Use Upload Key">
+    You sign AABs with your upload key (your keystore)
+    Google re-signs with the app signing key before distribution
+  </Step>
+</Steps>
+
+**Benefits:**
+- Google securely manages your app signing key
+- You can reset your upload key if compromised
+- Smaller app downloads through APK optimization
+
+## Version Code Auto-Increment
+
+When uploading to Play Store with service account configured:
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --upload-to-play-store
+```
+
+The version code is automatically checked against Play Store and incremented to the next available number.
+
+### Manual Version Increment
+
+Jump ahead by a specific number:
+
+```bash
+php artisan native:package android \
+  --build-type=bundle \
+  --upload-to-play-store \
+  --jump-by=10
+```
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml
+name: Android Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Install Dependencies
+        run: composer install
+      
+      - name: Build and Upload to Play Store
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$ANDROID_KEYSTORE_FILE" | base64 -d > keystore.jks
+          echo "$GOOGLE_SERVICE_ACCOUNT_KEY" | base64 -d > service-account.json
+          
+          php artisan native:package android \
+            --build-type=bundle \
+            --upload-to-play-store \
+            --play-store-track=internal \
+            --keystore=keystore.jks \
+            --google-service-key=service-account.json \
+            --no-tty
+```
+
+## Troubleshooting
+
+### Missing Signing Configuration
+
+```
+Missing required signing configuration
+  - --keystore (or ANDROID_KEYSTORE_FILE env var)
+```
+
+**Solution:** Provide all required signing parameters.
+
+### Version Code Already Used
+
+```
+This version code has already been used
+```
+
+**Solution:** Increment `NATIVEPHP_APP_VERSION_CODE` in `.env` or use auto-increment.
+
+### Package Name Mismatch
+
+```
+Package name does not match Play Console app
+```
+
+**Solution:** Ensure `NATIVEPHP_APP_ID` matches the package name in Play Console exactly.
+
+### Upload Failed
+
+**Solutions:**
+- Verify service account has Release Manager permissions
+- Check service account key hasn't expired
+- Ensure AAB is properly signed
+- Verify version code is higher than previous release
+
+### Build Failed
+
+Check the build log:
+
+```bash
+cat nativephp/android-build.log
+```
+
+Common issues:
+- Android SDK not configured
+- Gradle build errors
+- Missing dependencies
+- Signing configuration errors
+
+## Play Store Review Process
+
+<Steps>
+  <Step title="Automated Review">
+    Initial automated checks (usually minutes)
+  </Step>
+  
+  <Step title="Manual Review">
+    Human review of app functionality (varies, typically hours to days)
+  </Step>
+  
+  <Step title="Approval or Rejection">
+    You'll receive email notification of the decision
+  </Step>
+  
+  <Step title="Publishing">
+    If approved, app goes live based on your rollout settings
+  </Step>
+</Steps>
+
+**Review Guidelines:**
+- App must be stable and functional
+- Must comply with Google Play policies
+- Content rating must be accurate
+- Privacy policy required if collecting data
+- Target API level must meet minimum requirements
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="iOS Deployment" icon="apple" href="/build/ios-deployment">
+    Deploy your app to the App Store
+  </Card>
+  <Card title="Hot Reload" icon="fire" href="/build/hot-reload">
+    Speed up development with hot reload
+  </Card>
+</CardGroup>

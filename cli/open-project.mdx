@@ -1,0 +1,250 @@
+---
+title: native:open
+description: Open the Android Studio or Xcode project
+---
+
+Opens your native mobile project in the appropriate IDE (Android Studio for Android, Xcode for iOS).
+
+## Syntax
+
+```bash
+php artisan native:open [os]
+```
+
+## Arguments
+
+### os
+
+Platform to open. Optional.
+
+- `ios` - Open in Xcode
+- `android` - Open in Android Studio
+
+If not specified:
+- If only one platform is installed, opens automatically
+- If both are installed, you'll be prompted to choose
+
+## Examples
+
+### Open Android project
+
+```bash
+php artisan native:open android
+```
+
+Opens `nativephp/android/` in Android Studio.
+
+### Open iOS project
+
+```bash
+php artisan native:open ios
+```
+
+Opens `nativephp/ios/NativePHP.xcworkspace` in Xcode.
+
+### Auto-detect and open
+
+```bash
+php artisan native:open
+```
+
+Automatically opens the installed platform, or prompts if both exist.
+
+## What it does
+
+### Android
+
+1. Checks that `nativephp/android/` exists
+2. Launches Android Studio with the project
+3. Opens in the default or running Android Studio instance
+
+**Opens:** `nativephp/android/build.gradle`
+
+### iOS
+
+1. Checks that `nativephp/ios/` exists
+2. Opens the Xcode workspace (not project)
+3. Launches Xcode
+
+**Opens:** `nativephp/ios/NativePHP.xcworkspace`
+
+## Requirements
+
+### Android
+
+**Android Studio** must be installed:
+
+- **macOS**: `/Applications/Android Studio.app`
+- **Windows**: `C:\Program Files\Android\Android Studio`
+- **Linux**: `/opt/android-studio` or via snap
+
+If Android Studio is in a custom location, it will attempt to find it via PATH.
+
+### iOS
+
+**Xcode** must be installed (macOS only):
+
+- Install from App Store
+- Or download from [developer.apple.com](https://developer.apple.com/xcode/)
+
+Run `xcode-select --install` if command-line tools are missing.
+
+## Use cases
+
+### Debug native code
+
+Open the project to set breakpoints in Kotlin (Android) or Swift (iOS):
+
+```bash
+php artisan native:open android
+```
+
+Then debug from Android Studio/Xcode.
+
+### Modify native configuration
+
+Edit platform-specific files:
+- AndroidManifest.xml
+- Info.plist
+- Gradle build scripts
+- Xcode project settings
+
+### Add native dependencies
+
+Use the IDE to add libraries:
+- Android: Add to `build.gradle`
+- iOS: Add via Swift Package Manager or CocoaPods
+
+### Run platform tools
+
+Access IDE-specific tools:
+- Android: Logcat, Layout Inspector, Profiler
+- iOS: Instruments, View Debugger, Console
+
+## Common workflows
+
+### First-time setup
+
+After `native:install`, open to verify setup:
+
+```bash
+php artisan native:install android
+php artisan native:open android
+```
+
+Verify that:
+- Project loads without errors
+- SDK versions are correct
+- No missing dependencies
+
+### Fix native build errors
+
+If `native:run` fails with native errors:
+
+```bash
+php artisan native:open android
+```
+
+Then:
+1. Check error messages in IDE
+2. Fix configuration issues
+3. Sync Gradle/rebuild project
+4. Run again from terminal
+
+### Configure signing
+
+Open to verify/configure signing:
+
+```bash
+php artisan native:open android
+```
+
+- **Android**: Build > Generate Signed Bundle/APK
+- **iOS**: Signing & Capabilities tab
+
+### Inspect UI
+
+Debug UI issues:
+
+```bash
+php artisan native:run android
+php artisan native:open android
+```
+
+Then use:
+- **Android**: Layout Inspector (Tools > Layout Inspector)
+- **iOS**: View Debugger (Debug > View Debugging)
+
+## Troubleshooting
+
+### "No platform projects found"
+
+Run install first:
+
+```bash
+php artisan native:install
+```
+
+### Android Studio doesn't open
+
+Check installation:
+
+```bash
+# macOS
+open -a "Android Studio"
+
+# Linux
+android-studio
+
+# Windows
+start "" "C:\Program Files\Android\Android Studio\bin\studio64.exe"
+```
+
+If not found, install from [developer.android.com/studio](https://developer.android.com/studio)
+
+### Xcode doesn't open
+
+Install Xcode from Mac App Store, then:
+
+```bash
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+xcode-select --install
+```
+
+### Wrong project type opened
+
+For iOS, ensure opening `.xcworkspace` not `.xcodeproj`:
+
+```bash
+# Correct
+open nativephp/ios/NativePHP.xcworkspace
+
+# Wrong (missing CocoaPods)
+open nativephp/ios/NativePHP.xcodeproj
+```
+
+## Tips
+
+### macOS keyboard shortcut
+
+Create an alias:
+
+```bash
+alias oa="php artisan native:open android"
+alias oi="php artisan native:open ios"
+```
+
+### Keep IDE open
+
+Keep Android Studio/Xcode open while developing for faster iterations.
+
+### Sync after changes
+
+If you modify native files outside the IDE:
+- **Android**: File > Sync Project with Gradle Files
+- **iOS**: Clean Build Folder (Cmd+Shift+K)
+
+## See also
+
+- [native:run](/cli/run) - Build and run the app
+- [native:emulator](/cli/emulator) - Launch an emulator

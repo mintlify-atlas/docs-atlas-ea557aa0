@@ -1,0 +1,339 @@
+---
+title: Dialog
+description: Display native alerts and toast notifications
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Dialog;
+```
+
+## Methods
+
+### alert()
+
+Display a native alert dialog with a title, message, and custom buttons.
+
+<ParamField path="title" type="string" required>
+  The alert title
+</ParamField>
+
+<ParamField path="message" type="string" required>
+  The alert message
+</ParamField>
+
+<ParamField path="buttons" type="array" default="[]">
+  Array of button labels (e.g., ['OK', 'Cancel'])
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+$alert = Dialog::alert(
+    'Confirm Action',
+    'Are you sure you want to proceed?',
+    ['Yes', 'No']
+);
+```
+
+<ResponseField name="return" type="PendingAlert">
+  A pending alert instance for fluent configuration
+</ResponseField>
+
+**Events:** Triggers `ButtonPressed` event when a button is tapped.
+
+### toast()
+
+Display a brief toast notification message.
+
+<ParamField path="message" type="string" required>
+  The toast message to display
+</ParamField>
+
+<ParamField path="duration" type="string" default="long">
+  Duration: 'short' (~2s) or 'long' (~3.5s)
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+Dialog::toast('Settings saved successfully');
+
+Dialog::toast('Please try again', 'short');
+```
+
+### share() <Badge type="warn">Deprecated</Badge>
+
+<Warning>
+  This method is deprecated since version 2.0.0. Use `Share::url()` instead.
+</Warning>
+
+## PendingAlert Methods
+
+### id()
+
+Set a unique identifier for this alert to correlate button press events.
+
+<ParamField path="id" type="string" required>
+  Unique identifier
+</ParamField>
+
+```php
+Dialog::alert('Delete Item', 'Are you sure?', ['Delete', 'Cancel'])
+    ->id('delete-confirmation');
+```
+
+### getId()
+
+Get the alert's unique identifier.
+
+```php
+$pending = Dialog::alert('Title', 'Message');
+$id = $pending->getId(); // Returns UUID if not manually set
+```
+
+### event()
+
+Set a custom event class to dispatch when a button is pressed.
+
+<ParamField path="eventClass" type="string" required>
+  Fully qualified event class name
+</ParamField>
+
+```php
+Dialog::alert('Confirm', 'Proceed?', ['Yes', 'No'])
+    ->event(App\Events\UserConfirmation::class);
+```
+
+### remember()
+
+Store the alert ID in session for retrieval in event handlers.
+
+```php
+Dialog::alert('Title', 'Message', ['OK'])
+    ->id('alert-123')
+    ->remember();
+```
+
+### lastId()
+
+Retrieve the last remembered alert ID from session.
+
+```php
+$lastId = \Native\Mobile\PendingAlert::lastId();
+```
+
+### show()
+
+Explicitly show the alert (automatically called if not invoked).
+
+```php
+Dialog::alert('Title', 'Message')
+    ->id('alert-123')
+    ->show();
+```
+
+## Events
+
+### ButtonPressed
+
+Dispatched when a button in an alert is pressed.
+
+```php
+use Native\Mobile\Events\Alert\ButtonPressed;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(ButtonPressed::class, function (ButtonPressed $event) {
+    $buttonIndex = $event->index;  // 0-based index
+    $buttonLabel = $event->label;  // Button text
+    $alertId = $event->id;         // Alert ID if set
+    
+    if ($buttonIndex === 0) {
+        // First button pressed
+    }
+});
+```
+
+**Event Properties:**
+- `index` (int) - Button index (0-based)
+- `label` (string) - Button label text
+- `id` (string|null) - Alert tracking ID if set
+
+## Examples
+
+### Simple Alert
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+Dialog::alert(
+    'Welcome',
+    'Thanks for using our app!',
+    ['OK']
+);
+```
+
+### Confirmation Dialog
+
+```php
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Events\Alert\ButtonPressed;
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class DeleteButton extends Component
+{
+    public $itemId;
+    
+    public function confirmDelete()
+    {
+        Dialog::alert(
+            'Delete Item',
+            'This action cannot be undone. Continue?',
+            ['Delete', 'Cancel']
+        )->id('delete-' . $this->itemId)->remember();
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Alert\\ButtonPressed')]
+    public function handleButtonPress($data)
+    {
+        $expectedId = 'delete-' . $this->itemId;
+        
+        if ($data['id'] === $expectedId && $data['index'] === 0) {
+            // User pressed "Delete"
+            $this->performDelete();
+        }
+        // index === 1 means "Cancel" - do nothing
+    }
+    
+    private function performDelete()
+    {
+        Item::destroy($this->itemId);
+        Dialog::toast('Item deleted successfully');
+    }
+}
+```
+
+### Success Toast
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+public function saveSettings()
+{
+    // Save settings logic
+    $this->settings->save();
+    
+    // Show success message
+    Dialog::toast('Settings saved successfully', 'short');
+}
+```
+
+### Error Handling
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+public function processPayment()
+{
+    try {
+        $this->payment->process();
+        Dialog::toast('Payment successful!');
+    } catch (\Exception $e) {
+        Dialog::alert(
+            'Payment Failed',
+            $e->getMessage(),
+            ['Retry', 'Cancel']
+        )->id('payment-error');
+    }
+}
+```
+
+### Multi-Option Dialog
+
+```php
+use Native\Mobile\Facades\Dialog;
+use Livewire\Attributes\On;
+
+class ExportOptions extends Component
+{
+    public function showExportOptions()
+    {
+        Dialog::alert(
+            'Export Format',
+            'Choose an export format:',
+            ['PDF', 'Excel', 'CSV', 'Cancel']
+        )->id('export-format')->remember();
+    }
+    
+    #[On('native:Native\\Mobile\\Events\\Alert\\ButtonPressed')]
+    public function handleExportChoice($data)
+    {
+        if ($data['id'] !== 'export-format') return;
+        
+        match($data['index']) {
+            0 => $this->exportPdf(),
+            1 => $this->exportExcel(),
+            2 => $this->exportCsv(),
+            default => null, // Cancel
+        };
+    }
+}
+```
+
+### Timed Toast Notifications
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+class NotificationHelper
+{
+    public function quickMessage(string $message)
+    {
+        Dialog::toast($message, 'short');
+    }
+    
+    public function importantMessage(string $message)
+    {
+        Dialog::toast($message, 'long');
+    }
+    
+    public function progress(string $step)
+    {
+        Dialog::toast("Step $step completed", 'short');
+    }
+}
+```
+
+### Form Validation Alerts
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+class FormValidator
+{
+    public function validate(array $data)
+    {
+        if (empty($data['email'])) {
+            Dialog::alert(
+                'Validation Error',
+                'Email is required',
+                ['OK']
+            );
+            return false;
+        }
+        
+        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            Dialog::alert(
+                'Invalid Email',
+                'Please enter a valid email address',
+                ['OK']
+            );
+            return false;
+        }
+        
+        return true;
+    }
+}
+```

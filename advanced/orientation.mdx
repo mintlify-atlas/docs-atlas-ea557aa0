@@ -1,0 +1,458 @@
+---
+title: Screen Orientation
+description: Configure supported screen orientations for iPhone, iPad, and Android
+---
+
+Configure which screen orientations your NativePHP Mobile app supports on iOS and Android. Control portrait and landscape modes for different device types.
+
+## Configuration
+
+Screen orientation is configured in `config/nativephp.php`:
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+    'android' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+],
+```
+
+### Applying Changes
+
+After modifying orientation settings, rebuild the native configuration:
+
+```bash
+php artisan native:install --force
+php artisan native:run
+```
+
+## Orientation Options
+
+Each platform supports four orientation modes:
+
+### Portrait
+
+Standard vertical orientation with the device held upright:
+
+```php
+'portrait' => true,
+```
+
+**When to use:**
+- Most mobile apps
+- Content-focused apps (news, social media)
+- Forms and data entry
+- Apps with vertical scrolling
+
+### Upside Down
+
+Inverted portrait orientation (device rotated 180 degrees):
+
+```php
+'upside_down' => false, // Usually disabled
+```
+
+**When to use:**
+- Rarely used on iPhones (typically disabled)
+- May be useful for specialized use cases
+
+<Warning>
+Apple recommends disabling upside-down portrait on iPhones to avoid accidental rotation.
+</Warning>
+
+### Landscape Left
+
+Horizontal orientation with the home button on the left (or device tilted left):
+
+```php
+'landscape_left' => true,
+```
+
+**When to use:**
+- Video playback
+- Games
+- Dashboard and data visualization apps
+- Apps with wide content
+
+### Landscape Right
+
+Horizontal orientation with the home button on the right (or device tilted right):
+
+```php
+'landscape_right' => true,
+```
+
+**When to use:**
+- Video playback (usually combined with landscape_left)
+- Games
+- Apps requiring horizontal viewing
+
+<Tip>
+For landscape apps, enable both `landscape_left` and `landscape_right` to support rotation in either direction.
+</Tip>
+
+## Platform-Specific Behavior
+
+### iPhone
+
+iPhone orientation is configured independently from iPad:
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => true,
+        'upside_down' => false,      // Typically disabled
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+],
+```
+
+**Requirements:**
+- At least one orientation must be enabled
+- Upside-down portrait is typically disabled
+- Settings apply to all iPhone models
+
+### iPad
+
+iPad support is controlled by the `ipad` configuration option:
+
+```php
+'ipad' => true,
+```
+
+When iPad support is enabled:
+
+- **All orientations are automatically supported** (portrait, upside down, landscape left, landscape right)
+- This is required by Apple's App Store guidelines
+- You cannot selectively disable iPad orientations
+
+<Warning>
+Once an app is deployed to the App Store with iPad support, you **cannot** remove iPad support in future updates.
+</Warning>
+
+**When to enable iPad support:**
+- Your app UI scales well to larger screens
+- You want to reach iPad users
+- Your app provides a good experience on tablets
+
+**When to keep iPad support disabled:**
+- Your app is designed specifically for phone-sized screens
+- You're not ready to support tablet layouts
+- You want to limit your app to iPhones initially
+
+### Android
+
+Android orientation is configured independently:
+
+```php
+'orientation' => [
+    'android' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+],
+```
+
+**Requirements:**
+- At least one orientation must be enabled
+- Settings apply to all Android devices (phones and tablets)
+- Upside-down portrait is less common on Android
+
+## Common Configurations
+
+### Portrait Only (Default)
+
+Most mobile apps use portrait-only orientation:
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+    'android' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+],
+'ipad' => false,
+```
+
+**Best for:**
+- Social media apps
+- News and content apps
+- E-commerce apps
+- Form-heavy apps
+
+### Landscape Only
+
+For games or horizontal-focused apps:
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => false,
+        'upside_down' => false,
+        'landscape_left' => true,
+        'landscape_right' => true,
+    ],
+    'android' => [
+        'portrait' => false,
+        'upside_down' => false,
+        'landscape_left' => true,
+        'landscape_right' => true,
+    ],
+],
+'ipad' => false, // Or true if you want iPad support
+```
+
+**Best for:**
+- Racing games
+- Horizontal scrolling games
+- Video editing apps
+- Dashboard apps
+
+### All Orientations
+
+For apps that work well in any orientation:
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => true,
+        'landscape_right' => true,
+    ],
+    'android' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => true,
+        'landscape_right' => true,
+    ],
+],
+'ipad' => true, // Automatically supports all orientations
+```
+
+**Best for:**
+- Video playback apps
+- Photo viewing apps
+- Reading apps
+- Flexible UI apps
+
+### Portrait with Landscape Video
+
+For portrait apps that support landscape video playback:
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => true,  // For video
+        'landscape_right' => true, // For video
+    ],
+    'android' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => true,
+        'landscape_right' => true,
+    ],
+],
+'ipad' => false,
+```
+
+**Best for:**
+- Social media apps with video
+- News apps with video content
+- Apps with embedded video players
+
+## Responsive Design Considerations
+
+When supporting multiple orientations, design your UI to adapt:
+
+### Using Tailwind CSS Responsive Classes
+
+```html
+<!-- Portrait: stacked, Landscape: side-by-side -->
+<div class="flex flex-col landscape:flex-row">
+    <div class="w-full landscape:w-1/2">Content 1</div>
+    <div class="w-full landscape:w-1/2">Content 2</div>
+</div>
+```
+
+### Detecting Orientation in JavaScript
+
+```javascript
+// Check current orientation
+const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+
+// Listen for orientation changes
+window.matchMedia('(orientation: portrait)').addEventListener('change', e => {
+    if (e.matches) {
+        console.log('Switched to portrait');
+    }
+});
+```
+
+### Detecting Orientation in Livewire
+
+```php
+use Livewire\Component;
+
+class MyComponent extends Component
+{
+    public $isPortrait = true;
+
+    #[On('orientation-changed')]
+    public function handleOrientationChange($orientation)
+    {
+        $this->isPortrait = $orientation === 'portrait';
+    }
+}
+```
+
+```javascript
+// Emit orientation changes to Livewire
+window.matchMedia('(orientation: portrait)').addEventListener('change', e => {
+    Livewire.dispatch('orientation-changed', {
+        orientation: e.matches ? 'portrait' : 'landscape'
+    });
+});
+```
+
+## Validation
+
+The build process validates orientation configuration:
+
+**iPhone validation:**
+```bash
+# At least one iPhone orientation must be enabled
+Error: No iPhone orientations enabled. Enable at least one orientation.
+```
+
+**Android validation:**
+```bash
+# At least one Android orientation must be enabled
+Error: No Android orientations enabled. Enable at least one orientation.
+```
+
+## Testing Orientations
+
+Test your app in all supported orientations:
+
+### iOS Simulator
+
+```bash
+# Rotate simulator
+Cmd + Left Arrow  # Landscape left
+Cmd + Right Arrow # Landscape right
+Cmd + Up Arrow    # Portrait
+```
+
+### Android Emulator
+
+```bash
+# Rotate emulator
+Ctrl + Left Arrow  # Landscape left
+Ctrl + Right Arrow # Landscape right
+Ctrl + Up Arrow    # Portrait
+```
+
+### Physical Devices
+
+Test on real devices with auto-rotate enabled:
+
+1. Enable auto-rotate in device settings
+2. Physically rotate the device
+3. Verify UI adapts correctly
+4. Check for layout issues
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with portrait only">
+    Most apps work best in portrait mode. Only add landscape support if your app truly benefits from it.
+  </Accordion>
+  
+  <Accordion title="Support both landscape directions">
+    If you enable landscape mode, enable both left and right to allow natural device rotation.
+  </Accordion>
+  
+  <Accordion title="Consider iPad requirements">
+    Remember that iPad support requires all orientations. Only enable iPad if you're ready to support tablet layouts.
+  </Accordion>
+  
+  <Accordion title="Test orientation changes">
+    Test your app's behavior when rotating between orientations to ensure smooth transitions.
+  </Accordion>
+  
+  <Accordion title="Use responsive design">
+    Design your UI to adapt gracefully to different orientations using responsive CSS classes.
+  </Accordion>
+  
+  <Accordion title="Disable upside-down portrait">
+    For iPhones, keep upside-down portrait disabled unless you have a specific use case.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### App doesn't rotate
+
+1. Verify orientation is enabled in config
+2. Run `php artisan native:install --force`
+3. Check device auto-rotate is enabled
+4. Rebuild and reinstall the app
+
+### iPad shows wrong orientations
+
+Remember: When `ipad` is enabled, all orientations are automatically supported regardless of iPhone settings.
+
+### Build fails with orientation error
+
+Ensure at least one orientation is enabled for each platform:
+
+```php
+// This will fail:
+'iphone' => [
+    'portrait' => false,
+    'upside_down' => false,
+    'landscape_left' => false,
+    'landscape_right' => false,
+],
+
+// At least one must be true:
+'iphone' => [
+    'portrait' => true, // ✓
+    // ... other orientations
+],
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Learn about other configuration options
+  </Card>
+  <Card title="Responsive Design" icon="mobile-screen" href="/advanced/orientation">
+    Build responsive layouts for different orientations
+  </Card>
+</CardGroup>

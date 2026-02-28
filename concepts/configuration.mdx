@@ -1,0 +1,569 @@
+---
+title: Configuration Reference
+description: Complete reference for all NativePHP Mobile configuration options
+---
+
+NativePHP Mobile is configured through the `config/nativephp.php` file. This page documents all available configuration options.
+
+## Publishing Configuration
+
+The configuration file is published during installation, but you can republish it anytime:
+
+```bash
+php artisan vendor:publish --tag=nativephp-config
+```
+
+## App Settings
+
+### Version
+
+<ParamField path="version" type="string" default="1.0.0">
+  The human-readable version of your app (e.g., "1.0.0", "2.1.3"). This is used as the `versionName` in Android builds and may be displayed in the app or console.
+  
+  **Environment Variable**: `NATIVEPHP_APP_VERSION`
+</ParamField>
+
+```php
+'version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+```
+
+### Version Code
+
+<ParamField path="version_code" type="int" default="1">
+  The internal numeric version code used for Play Store builds. This **must increase** with every release. Used as `versionCode` in Android builds and required for publishing updates.
+  
+  **Environment Variable**: `NATIVEPHP_APP_VERSION_CODE`
+</ParamField>
+
+```php
+'version_code' => env('NATIVEPHP_APP_VERSION_CODE', 1),
+```
+
+<Warning>
+Always increment `version_code` when releasing updates to the Play Store, even if the version string stays the same.
+</Warning>
+
+### App ID
+
+<ParamField path="app_id" type="string" required>
+  The unique identifier for your application. Written in reverse domain format (e.g., `com.nativephp.app`). This is used by both Android and iOS to uniquely identify your app.
+  
+  **Environment Variable**: `NATIVEPHP_APP_ID`
+</ParamField>
+
+```php
+'app_id' => env('NATIVEPHP_APP_ID'),
+```
+
+<Tip>
+Choose your app ID carefully - it cannot be changed after publishing to app stores.
+</Tip>
+
+### Deep Linking
+
+<ParamField path="deeplink_scheme" type="string">
+  Custom URL scheme for opening your app (e.g., `myapp://some/path`). This allows other apps and websites to deep link into your app.
+  
+  **Environment Variable**: `NATIVEPHP_DEEPLINK_SCHEME`
+</ParamField>
+
+```php
+'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME'),
+```
+
+<ParamField path="deeplink_host" type="string">
+  Domain name for verified HTTPS links and NFC tags (e.g., `example.com`). This allows URLs like `https://example.com/path` to open your app when tapped from NFC tags or browsers.
+  
+  **Environment Variable**: `NATIVEPHP_DEEPLINK_HOST`
+</ParamField>
+
+```php
+'deeplink_host' => env('NATIVEPHP_DEEPLINK_HOST'),
+```
+
+### Start URL
+
+<ParamField path="start_url" type="string" default="/">
+  The initial path to load when the app starts. Should be a path relative to your app root (e.g., `/dashboard`, `/onboarding`).
+  
+  **Environment Variable**: `NATIVEPHP_START_URL`
+</ParamField>
+
+```php
+'start_url' => env('NATIVEPHP_START_URL', '/'),
+```
+
+## iOS Settings
+
+### Development Team
+
+<ParamField path="development_team" type="string">
+  Your Apple Developer Team ID for code signing iOS apps. This is automatically detected from your installed certificates, but can be overridden here. Find your Team ID in your Apple Developer account under Membership details.
+  
+  **Environment Variable**: `NATIVEPHP_DEVELOPMENT_TEAM`
+</ParamField>
+
+```php
+'development_team' => env('NATIVEPHP_DEVELOPMENT_TEAM'),
+```
+
+### iPad Support
+
+<ParamField path="ipad" type="bool" default="false">
+  Enable or disable iPad support for your iOS app. When enabled, your app will support iPad devices and **all** iPad orientations as required by Apple's App Store guidelines. When disabled, your app will be iPhone-only.
+</ParamField>
+
+```php
+'ipad' => false,
+```
+
+<Warning>
+Once an app is deployed to the App Store with iPad support, you **cannot** revoke this action.
+</Warning>
+
+## Android Settings
+
+<ParamField path="android.gradle_jdk_path" type="string">
+  Path to the JDK installation to use for Gradle builds.
+  
+  **Environment Variable**: `NATIVEPHP_GRADLE_PATH`
+</ParamField>
+
+<ParamField path="android.android_sdk_path" type="string">
+  Path to your Android SDK installation.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_SDK_LOCATION`
+</ParamField>
+
+<ParamField path="android.emulator_path" type="string">
+  Path to the Android emulator binary.
+  
+  **Environment Variable**: `ANDROID_EMULATOR`
+</ParamField>
+
+<ParamField path="android.7zip-location" type="string" default="C:\\Program Files\\7-Zip\\7z.exe">
+  Path to 7-Zip executable (Windows only).
+  
+  **Environment Variable**: `NATIVEPHP_7ZIP_LOCATION`
+</ParamField>
+
+### Status Bar Style
+
+<ParamField path="android.status_bar_style" type="string" default="auto">
+  Controls the color of status bar and navigation bar icons.
+  
+  Options:
+  - `auto` - Auto-detect from system theme (recommended)
+  - `light` - Light/white icons
+  - `dark` - Dark icons
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_STATUS_BAR_STYLE`
+</ParamField>
+
+```php
+'android' => [
+    'status_bar_style' => env('NATIVEPHP_ANDROID_STATUS_BAR_STYLE', 'auto'),
+],
+```
+
+### Build Configuration
+
+Android build optimization settings:
+
+<ParamField path="android.build.minify_enabled" type="bool" default="false">
+  Enable R8/ProGuard minification to reduce APK size.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_MINIFY_ENABLED`
+</ParamField>
+
+<ParamField path="android.build.shrink_resources" type="bool" default="false">
+  Remove unused resources from the APK.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_SHRINK_RESOURCES`
+</ParamField>
+
+<ParamField path="android.build.obfuscate" type="bool" default="false">
+  Obfuscate code to make reverse engineering harder.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_OBFUSCATE`
+</ParamField>
+
+<ParamField path="android.build.debug_symbols" type="string" default="FULL">
+  Debug symbol configuration. Options: `FULL`, `LINE_TABLES_ONLY`, `NONE`.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_DEBUG_SYMBOLS`
+</ParamField>
+
+<ParamField path="android.build.generate_mapping_files" type="bool" default="false">
+  Generate ProGuard mapping files for crash report deobfuscation.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_MAPPING_FILES`
+</ParamField>
+
+<ParamField path="android.build.parallel_builds" type="bool" default="true">
+  Enable parallel Gradle builds for faster compilation.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_PARALLEL_BUILDS`
+</ParamField>
+
+<ParamField path="android.build.incremental_builds" type="bool" default="true">
+  Enable incremental builds to speed up subsequent builds.
+  
+  **Environment Variable**: `NATIVEPHP_ANDROID_INCREMENTAL_BUILDS`
+</ParamField>
+
+## Device Orientation
+
+Configure which orientations your app supports on different devices:
+
+### iPhone Orientation
+
+```php
+'orientation' => [
+    'iphone' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+],
+```
+
+<ParamField path="orientation.iphone.portrait" type="bool" default="true">
+  Support portrait mode (home button at bottom)
+</ParamField>
+
+<ParamField path="orientation.iphone.upside_down" type="bool" default="false">
+  Support upside-down portrait (home button at top)
+</ParamField>
+
+<ParamField path="orientation.iphone.landscape_left" type="bool" default="false">
+  Support landscape with home button on left
+</ParamField>
+
+<ParamField path="orientation.iphone.landscape_right" type="bool" default="false">
+  Support landscape with home button on right
+</ParamField>
+
+### Android Orientation
+
+```php
+'orientation' => [
+    'android' => [
+        'portrait' => true,
+        'upside_down' => false,
+        'landscape_left' => false,
+        'landscape_right' => false,
+    ],
+],
+```
+
+<Note>
+For iPad, all orientations are automatically supported when `ipad` is enabled, as required by Apple's guidelines.
+</Note>
+
+<Warning>
+At least one orientation must be enabled, or the build will fail.
+</Warning>
+
+## Security
+
+### Environment Key Cleanup
+
+<ParamField path="cleanup_env_keys" type="array">
+  Environment variable keys to remove from `.env` during app bundling. This prevents secrets or development credentials from being leaked in the bundled app. Wildcards are supported.
+</ParamField>
+
+```php
+'cleanup_env_keys' => [
+    'AWS_*',
+    'GITHUB_*',
+    'DO_SPACES_*',
+    '*_SECRET',
+    'DB_PASSWORD',
+    'DB_USERNAME',
+],
+```
+
+### File Exclusion
+
+<ParamField path="cleanup_exclude_files" type="array">
+  Files and folders to remove before the final bundle is built. Use glob/wildcard patterns to skip unnecessary assets like logs, sessions, or temp data.
+</ParamField>
+
+```php
+'cleanup_exclude_files' => [
+    'storage/framework/sessions',
+    'storage/framework/cache',
+    'storage/framework/testing',
+    'storage/logs/laravel.log',
+],
+```
+
+## Development Server
+
+Configuration for the NativePHP development server that enables hot reloading:
+
+<ParamField path="server.http_port" type="int" default="3000">
+  HTTP server port for serving the app.
+  
+  **Environment Variable**: `NATIVEPHP_HTTP_PORT`
+</ParamField>
+
+<ParamField path="server.ws_port" type="int" default="8081">
+  WebSocket server port for hot reload communication.
+  
+  **Environment Variable**: `NATIVEPHP_WS_PORT`
+</ParamField>
+
+<ParamField path="server.service_name" type="string" default="NativePHP Server">
+  Service name advertised on the network via mDNS.
+  
+  **Environment Variable**: `NATIVEPHP_SERVICE_NAME`
+</ParamField>
+
+<ParamField path="server.service_type" type="string" default="_http._tcp">
+  Service type for mDNS advertisement.
+</ParamField>
+
+<ParamField path="server.public_path" type="string" default="public">
+  Public directory to serve (relative to Laravel root).
+  
+  **Environment Variable**: `NATIVEPHP_PUBLIC_PATH`
+</ParamField>
+
+<ParamField path="server.build_path" type="string" default="storage/app/native-build">
+  Build output directory where the ZIP will be created.
+  
+  **Environment Variable**: `NATIVEPHP_BUILD_PATH`
+</ParamField>
+
+<ParamField path="server.open_browser" type="bool" default="true">
+  Automatically open browser with QR code when server starts.
+  
+  **Environment Variable**: `NATIVEPHP_OPEN_BROWSER`
+</ParamField>
+
+<ParamField path="server.watch_paths" type="array">
+  Directories to watch for changes during development.
+</ParamField>
+
+```php
+'server' => [
+    'watch_paths' => [
+        'app',
+        'resources',
+        'routes',
+        'public/build',
+    ],
+],
+```
+
+<ParamField path="server.watch_extensions" type="array">
+  File extensions to watch for changes.
+</ParamField>
+
+```php
+'server' => [
+    'watch_extensions' => ['php', 'blade.php', 'js', 'css', 'ts', 'vue', 'json'],
+],
+```
+
+## Hot Reload
+
+Configuration for hot reload functionality:
+
+<ParamField path="hot_reload.watch_paths" type="array">
+  Directories to monitor for file changes.
+</ParamField>
+
+```php
+'hot_reload' => [
+    'watch_paths' => [
+        'app',
+        'resources',
+        'routes',
+        'config',
+        'public',
+    ],
+],
+```
+
+<ParamField path="hot_reload.exclude_patterns" type="array">
+  Regex patterns for paths to exclude from watching.
+</ParamField>
+
+```php
+'hot_reload' => [
+    'exclude_patterns' => [
+        '\.git',
+        'storage',
+        'tests',
+        'nativephp',
+        'credentials',
+        'node_modules',
+        '\.swp',
+        '\.tmp',
+        '~',
+        '\.log',
+    ],
+],
+```
+
+## App Store Connect
+
+Configuration for uploading apps to App Store Connect:
+
+<ParamField path="app_store_connect.api_key" type="string">
+  App Store Connect API key (store in `.env`).
+  
+  **Environment Variable**: `APP_STORE_API_KEY`
+</ParamField>
+
+<ParamField path="app_store_connect.api_key_id" type="string">
+  App Store Connect API Key ID.
+  
+  **Environment Variable**: `APP_STORE_API_KEY_ID`
+</ParamField>
+
+<ParamField path="app_store_connect.api_issuer_id" type="string">
+  App Store Connect API Issuer ID.
+  
+  **Environment Variable**: `APP_STORE_API_ISSUER_ID`
+</ParamField>
+
+<ParamField path="app_store_connect.app_name" type="string">
+  Your app name in App Store Connect.
+  
+  **Environment Variable**: `APP_STORE_APP_NAME`
+</ParamField>
+
+```php
+'app_store_connect' => [
+    'api_key' => env('APP_STORE_API_KEY'),
+    'api_key_id' => env('APP_STORE_API_KEY_ID'),
+    'api_issuer_id' => env('APP_STORE_API_ISSUER_ID'),
+    'app_name' => env('APP_STORE_APP_NAME'),
+],
+```
+
+<Tip>
+Store all App Store Connect credentials in your `.env` file, not in the config file.
+</Tip>
+
+## Permissions
+
+Enable or disable specific native features and define permission request messages:
+
+<ParamField path="permissions" type="array">
+  Array of permission keys mapped to boolean or string values.
+  
+  - `true` - Enable permission with default message
+  - `false` - Disable permission
+  - `string` - Enable with custom iOS permission message
+</ParamField>
+
+```php
+'permissions' => [
+    'camera' => 'We need camera access to scan QR codes for login.',
+    'location' => 'We use your location to show nearby stores.',
+    'microphone' => true,  // Uses default message
+    'notifications' => true,
+],
+```
+
+<Info>
+On iOS, custom permission messages are shown when requesting access. Android interprets any string value as `true` but doesn't display custom messages.
+</Info>
+
+Available permission keys:
+- `camera`
+- `location`
+- `microphone`
+- `notifications`
+- `photo_library`
+- `contacts`
+- `calendar`
+- `reminders`
+- `bluetooth`
+- `motion`
+- `speech_recognition`
+- `face_id`
+- `nfc`
+
+<Warning>
+Run `php artisan native:install --force` after changing permissions to update the native project files.
+</Warning>
+
+## Example Configuration
+
+Here's a complete example configuration for a production app:
+
+```php
+return [
+    'version' => '2.1.0',
+    'version_code' => 21,
+    'app_id' => 'com.mycompany.myapp',
+    
+    'deeplink_scheme' => 'myapp',
+    'deeplink_host' => 'myapp.com',
+    'start_url' => '/dashboard',
+    
+    'development_team' => 'ABC123XYZ',
+    'ipad' => true,
+    
+    'android' => [
+        'status_bar_style' => 'auto',
+        'build' => [
+            'minify_enabled' => true,
+            'shrink_resources' => true,
+            'obfuscate' => false,
+            'debug_symbols' => 'LINE_TABLES_ONLY',
+        ],
+    ],
+    
+    'orientation' => [
+        'iphone' => [
+            'portrait' => true,
+            'upside_down' => false,
+            'landscape_left' => true,
+            'landscape_right' => true,
+        ],
+        'android' => [
+            'portrait' => true,
+            'upside_down' => false,
+            'landscape_left' => true,
+            'landscape_right' => true,
+        ],
+    ],
+    
+    'permissions' => [
+        'camera' => 'Required for scanning QR codes and taking photos',
+        'location' => 'Used to show nearby locations',
+        'notifications' => 'Get notified about important updates',
+    ],
+    
+    'cleanup_env_keys' => [
+        'AWS_*',
+        '*_SECRET',
+        'DB_PASSWORD',
+    ],
+];
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how NativePHP Mobile works
+  </Card>
+  <Card title="Native APIs" icon="mobile" href="/features/camera">
+    Explore available native APIs
+  </Card>
+  <Card title="Permissions" icon="shield" href="/advanced/permissions">
+    Learn about requesting permissions
+  </Card>
+  <Card title="Building Apps" icon="hammer" href="/build/packaging">
+    Build your app for production
+  </Card>
+</CardGroup>

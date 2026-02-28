@@ -1,0 +1,206 @@
+---
+title: Browser
+description: Open URLs in external browsers, in-app browsers, or authentication sessions
+---
+
+## Import
+
+```php
+use Native\Mobile\Facades\Browser;
+```
+
+## Methods
+
+### open()
+
+Open a URL in the system's default external browser (Safari on iOS, Chrome/default browser on Android).
+
+<ParamField path="url" type="string" required>
+  The URL to open
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Browser;
+
+$success = Browser::open('https://nativephp.com');
+```
+
+<ResponseField name="return" type="bool">
+  True if the browser was successfully opened, false otherwise
+</ResponseField>
+
+### inApp()
+
+Open a URL in an in-app browser window (SFSafariViewController on iOS, Custom Tabs on Android). The browser opens within your app with limited UI chrome.
+
+<ParamField path="url" type="string" required>
+  The URL to open (must be a valid URL)
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Browser;
+
+$success = Browser::inApp('https://nativephp.com/docs');
+```
+
+<ResponseField name="return" type="bool">
+  True if the in-app browser was successfully opened, false otherwise
+</ResponseField>
+
+<Note>
+  This method validates the URL format and throws an `InvalidArgumentException` if the URL is invalid.
+</Note>
+
+### auth()
+
+Open a URL in an authentication session (ASWebAuthenticationSession on iOS). Automatically handles OAuth callbacks with your configured deeplink scheme.
+
+This is ideal for OAuth flows as it shares cookies with Safari and automatically captures redirect URLs.
+
+<ParamField path="url" type="string" required>
+  The authentication URL to open (usually an OAuth authorization URL)
+</ParamField>
+
+```php
+use Native\Mobile\Facades\Browser;
+
+$authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
+$authUrl .= http_build_query([
+    'client_id' => config('services.google.client_id'),
+    'redirect_uri' => 'myapp://oauth/callback',
+    'response_type' => 'code',
+    'scope' => 'email profile',
+]);
+
+$success = Browser::auth($authUrl);
+```
+
+<ResponseField name="return" type="bool">
+  True if the authentication session was successfully started, false otherwise
+</ResponseField>
+
+## Examples
+
+### Opening External Links
+
+```php
+use Native\Mobile\Facades\Browser;
+
+// Open documentation in external browser
+Browser::open('https://nativephp.com/docs');
+
+// Open support email
+Browser::open('mailto:support@example.com');
+
+// Open phone dialer
+Browser::open('tel:+1234567890');
+```
+
+### In-App Documentation Viewer
+
+```php
+use Native\Mobile\Facades\Browser;
+use Livewire\Component;
+
+class HelpButton extends Component
+{
+    public function openHelp()
+    {
+        // Open help docs without leaving the app
+        $success = Browser::inApp('https://docs.example.com/mobile-app');
+        
+        if (!$success) {
+            $this->addError('browser', 'Unable to open help documentation');
+        }
+    }
+}
+```
+
+### OAuth Authentication Flow
+
+```php
+use Native\Mobile\Facades\Browser;
+use Illuminate\Support\Facades\Route;
+
+class OAuthController extends Controller
+{
+    public function redirectToProvider()
+    {
+        $state = Str::random(40);
+        session(['oauth_state' => $state]);
+        
+        $authUrl = 'https://github.com/login/oauth/authorize?' . http_build_query([
+            'client_id' => config('services.github.client_id'),
+            'redirect_uri' => 'myapp://oauth/callback',
+            'scope' => 'user:email',
+            'state' => $state,
+        ]);
+        
+        Browser::auth($authUrl);
+    }
+}
+
+// Handle the callback in your deeplink route
+Route::get('/oauth/callback', function (Request $request) {
+    if ($request->state !== session('oauth_state')) {
+        abort(403, 'Invalid state');
+    }
+    
+    // Exchange code for token
+    $token = Http::post('https://github.com/login/oauth/access_token', [
+        'client_id' => config('services.github.client_id'),
+        'client_secret' => config('services.github.client_secret'),
+        'code' => $request->code,
+    ])->json();
+    
+    // Store token and authenticate user
+    auth()->user()->update(['github_token' => $token['access_token']]);
+    
+    return redirect()->route('dashboard');
+});
+```
+
+### Conditional Browser Selection
+
+```php
+use Native\Mobile\Facades\Browser;
+
+class LinkHandler
+{
+    public function openLink(string $url, bool $external = false)
+    {
+        if ($external || $this->isExternalDomain($url)) {
+            // Open external domains in system browser
+            return Browser::open($url);
+        }
+        
+        // Open internal/trusted domains in-app
+        return Browser::inApp($url);
+    }
+    
+    private function isExternalDomain(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        $trustedDomains = ['example.com', 'docs.example.com'];
+        
+        return !in_array($host, $trustedDomains);
+    }
+}
+```
+
+### Privacy-Friendly Terms & Conditions
+
+```php
+use Native\Mobile\Facades\Browser;
+
+// Open terms in-app so users stay in your app context
+public function showTerms()
+{
+    Browser::inApp('https://example.com/terms');
+}
+
+public function showPrivacyPolicy()
+{
+    Browser::inApp('https://example.com/privacy');
+}
+```
