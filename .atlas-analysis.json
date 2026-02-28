@@ -1,0 +1,166 @@
+{
+  "projectType": "framework",
+  "projectName": "NativePHP Mobile",
+  "projectDescription": "Build native iOS and Android applications using PHP and Laravel",
+  "theme": "palm",
+  "primaryColor": "#7C3AED",
+  "lightColor": "#A78BFA",
+  "darkColor": "#5B21B6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/lifecycle",
+              "concepts/configuration",
+              "concepts/blade-components"
+            ]
+          },
+          {
+            "group": "Native Features",
+            "pages": [
+              "features/biometrics",
+              "features/browser",
+              "features/camera",
+              "features/device",
+              "features/dialogs",
+              "features/files",
+              "features/geolocation",
+              "features/haptics",
+              "features/microphone",
+              "features/network",
+              "features/push-notifications",
+              "features/scanner",
+              "features/secure-storage",
+              "features/share",
+              "features/wallet"
+            ]
+          },
+          {
+            "group": "UI Components",
+            "pages": [
+              "components/overview",
+              "components/bottom-navigation"
+            ]
+          },
+          {
+            "group": "Building & Deployment",
+            "pages": [
+              "build/development-workflow",
+              "build/packaging",
+              "build/ios-deployment",
+              "build/android-deployment",
+              "build/hot-reload"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/plugins",
+              "advanced/custom-plugins",
+              "advanced/permissions",
+              "advanced/orientation",
+              "advanced/deeplinks"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/install",
+              "cli/run",
+              "cli/package",
+              "cli/build-ios",
+              "cli/release",
+              "cli/watch",
+              "cli/plugins"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Facades",
+            "pages": [
+              "api/biometrics",
+              "api/browser",
+              "api/camera",
+              "api/device",
+              "api/dialog",
+              "api/file",
+              "api/geolocation",
+              "api/haptics",
+              "api/microphone",
+              "api/network",
+              "api/push-notifications",
+              "api/scanner",
+              "api/secure-storage",
+              "api/share",
+              "api/system",
+              "api/wallet"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Build native iOS and Android apps with PHP",
+    "Laravel integration with service provider",
+    "Native device features (camera, biometrics, geolocation)",
+    "Hot reload development workflow",
+    "Plugin system for extending functionality",
+    "Blade components for native UI",
+    "CLI tools for building and deployment"
+  ],
+  "publicApiSurface": [
+    "Native\\Mobile\\Facades\\Biometrics",
+    "Native\\Mobile\\Facades\\Browser",
+    "Native\\Mobile\\Facades\\Camera",
+    "Native\\Mobile\\Facades\\Device",
+    "Native\\Mobile\\Facades\\Dialog",
+    "Native\\Mobile\\Facades\\File",
+    "Native\\Mobile\\Facades\\Geolocation",
+    "Native\\Mobile\\Facades\\Haptics",
+    "Native\\Mobile\\Facades\\Microphone",
+    "Native\\Mobile\\Facades\\MobileWallet",
+    "Native\\Mobile\\Facades\\Network",
+    "Native\\Mobile\\Facades\\PushNotifications",
+    "Native\\Mobile\\Facades\\Scanner",
+    "Native\\Mobile\\Facades\\SecureStorage",
+    "Native\\Mobile\\Facades\\Share",
+    "Native\\Mobile\\Facades\\System",
+    "php artisan native:install",
+    "php artisan native:run",
+    "php artisan native:package",
+    "php artisan native:build-ios",
+    "php artisan native:release",
+    "php artisan native:watch",
+    "php artisan native:plugin:create",
+    "php artisan native:plugin:register"
+  ]
+}
