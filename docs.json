@@ -93,15 +93,32 @@
         "tab": "CLI Reference",
         "groups": [
           {
-            "group": "Commands",
+            "group": "Main Commands",
             "pages": [
               "cli/install",
               "cli/run",
               "cli/package",
               "cli/build-ios",
               "cli/release",
-              "cli/watch",
+              "cli/watch"
+            ]
+          },
+          {
+            "group": "Plugin Commands",
+            "pages": [
               "cli/plugins"
+            ]
+          },
+          {
+            "group": "Utility Commands",
+            "pages": [
+              "cli/check-build-number",
+              "cli/credentials",
+              "cli/emulator",
+              "cli/jump",
+              "cli/open-project",
+              "cli/tail",
+              "cli/version"
             ]
           }
         ]
